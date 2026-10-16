@@ -3,7 +3,7 @@ package engine
 import (
 	"testing"
 
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // filterStep is a minimal Step whose Class() is configurable for tests.

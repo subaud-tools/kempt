@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // Select resolves the set of packages to plan.

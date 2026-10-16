@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 // Fetch runs `git -C <dir> fetch --quiet`.

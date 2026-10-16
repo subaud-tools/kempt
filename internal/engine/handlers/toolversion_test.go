@@ -3,9 +3,9 @@ package handlers
 import (
 	"testing"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/release"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/release"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func ctxWith(r run.Runner, rel release.Releases) *machine.Context {

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 // isManifestURL reports whether ref is an http(s) URL to fetch rather than a

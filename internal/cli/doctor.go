@@ -6,12 +6,12 @@ import (
 	"io"
 	"os"
 
-	tools "github.com/schuettc/tools-common"
+	tools "github.com/subaud-tools/tools-common"
 
-	"github.com/schuettc/kempt/internal/doctor"
-	"github.com/schuettc/kempt/internal/engine"
-	_ "github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/doctor"
+	"github.com/subaud-tools/kempt/internal/engine"
+	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 func init() {

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	_ "github.com/schuettc/kempt/internal/engine/handlers"
+	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
 )
 
 func init() {

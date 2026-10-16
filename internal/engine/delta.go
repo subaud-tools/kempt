@@ -4,8 +4,8 @@
 package engine
 
 import (
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // Op is the outcome of inspecting a step against the current machine state.

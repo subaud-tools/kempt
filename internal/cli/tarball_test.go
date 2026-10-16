@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/run"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 // buildTarGz builds a gzipped tar with every file under a single wrapper dir

@@ -3,9 +3,9 @@ package doctor
 import (
 	"fmt"
 
-	"github.com/schuettc/kempt/internal/engine"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/engine"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // CheckRollup builds the plan for the selected packages and rolls its outcome

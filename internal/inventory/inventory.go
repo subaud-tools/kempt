@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/machine"
 )
 
 // Inventory command keys. These strings double as ctx.Cache memoization keys

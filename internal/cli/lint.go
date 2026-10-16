@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // runLint validates a manifest from a path, an http(s) URL, or "-" (stdin).

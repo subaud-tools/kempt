@@ -39,7 +39,7 @@ description = "local multi-agent coordination bus"
 only = { os = "darwin" }
 
   [[packages.muster.github-release]]
-  repo = "schuettc/muster"
+  repo = "subaud-tools/muster"
   asset = "muster_{os}_{arch}.tar.gz"
   bin = "muster"
 
@@ -53,7 +53,7 @@ only = { os = "darwin" }
 
   [[packages.muster.verify]]
   command-exists = "muster"
-  version-current = { repo = "schuettc/muster", command = "muster version" }
+  version-current = { repo = "subaud-tools/muster", command = "muster version" }
 
 [profiles.developer]
 description = "full toolchain: terminal, editors, agents"

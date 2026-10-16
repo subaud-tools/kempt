@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func TestScanExtensionsReportsBehind(t *testing.T) {

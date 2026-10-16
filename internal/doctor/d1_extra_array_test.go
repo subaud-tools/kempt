@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func writeFile(t *testing.T, path, body string) {

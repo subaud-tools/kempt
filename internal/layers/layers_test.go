@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/engine"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/engine"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 const baseSrc = `

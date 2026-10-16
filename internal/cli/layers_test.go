@@ -9,12 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/layers"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/release"
-	"github.com/schuettc/kempt/internal/run"
-	"github.com/schuettc/kempt/internal/state"
-	tools "github.com/schuettc/tools-common"
+	"github.com/subaud-tools/kempt/internal/layers"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/release"
+	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/state"
+	tools "github.com/subaud-tools/tools-common"
 )
 
 // The base owns settings.json packages with arrays = "replace".

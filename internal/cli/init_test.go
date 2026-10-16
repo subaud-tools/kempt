@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/picker"
-	"github.com/schuettc/kempt/internal/run"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/picker"
+	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 const initManifest = `

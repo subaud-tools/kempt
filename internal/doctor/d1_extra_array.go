@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/schuettc/kempt/internal/engine"
-	"github.com/schuettc/kempt/internal/jsonutil"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/engine"
+	"github.com/subaud-tools/kempt/internal/jsonutil"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 func CheckExtraArray(ctx *machine.Context, pkgs []*manifest.Package) []Finding {

@@ -4,8 +4,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func TestRunAggregates(t *testing.T) {

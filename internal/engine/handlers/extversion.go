@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/inventory"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/inventory"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // ExtEntry is one rolling npm/pi extension entry from an install step. Backend

@@ -9,11 +9,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/gitrepo"
-	"github.com/schuettc/kempt/internal/layers"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/gitrepo"
+	"github.com/subaud-tools/kempt/internal/layers"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func init() {

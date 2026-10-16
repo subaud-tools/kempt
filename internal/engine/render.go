@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 var markers = map[Op]string{

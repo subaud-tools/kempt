@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/machine"
 )
 
 // semverRe matches a bare semantic version, optionally with a prerelease

@@ -5,9 +5,9 @@ import (
 	"io"
 	"os"
 
-	"github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // loadSelectedContext reproduces the manifest-read + parse + validate +

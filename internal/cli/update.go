@@ -10,15 +10,15 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/schuettc/kempt/internal/engine"
-	_ "github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/gitrepo"
-	"github.com/schuettc/kempt/internal/layers"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/state"
-	"github.com/schuettc/kempt/internal/version"
-	tools "github.com/schuettc/tools-common"
+	"github.com/subaud-tools/kempt/internal/engine"
+	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/gitrepo"
+	"github.com/subaud-tools/kempt/internal/layers"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/version"
+	tools "github.com/subaud-tools/tools-common"
 )
 
 // selfUpdate is a seam so tests can stub the binary-replace step (which

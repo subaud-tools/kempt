@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/engine"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/engine"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func gitCloneHandler(t *testing.T) engine.Handler {

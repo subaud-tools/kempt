@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/engine"
-	_ "github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/release"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/engine"
+	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/release"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 // integrationSrc exercises the files class end-to-end (symlink + line-in-file +

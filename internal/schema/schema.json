@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/schuettc/kempt/schema/kempt.json",
+  "$id": "https://github.com/subaud-tools/kempt/schema/kempt.json",
   "title": "kempt.toml",
   "type": "object",
   "additionalProperties": false,

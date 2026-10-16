@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 // TestMain stubs loadState to an empty absent state so that plan/apply/verify
