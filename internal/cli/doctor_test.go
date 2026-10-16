@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/run"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func TestDoctorRegistered(t *testing.T) {

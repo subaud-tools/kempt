@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/engine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/engine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 func jsonHandler(t *testing.T) engine.Handler {

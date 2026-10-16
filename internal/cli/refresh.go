@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/schuettc/kempt/internal/engine"
-	_ "github.com/schuettc/kempt/internal/engine/handlers"
-	"github.com/schuettc/kempt/internal/gitrepo"
-	"github.com/schuettc/kempt/internal/manifest"
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/engine"
+	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
+	"github.com/subaud-tools/kempt/internal/gitrepo"
+	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func init() {

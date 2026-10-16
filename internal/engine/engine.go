@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // BuildPlan inspects each selected package against the machine context and

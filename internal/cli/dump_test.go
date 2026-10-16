@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func TestDumpHappyPath(t *testing.T) {

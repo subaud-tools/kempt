@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/machine"
 )
 
 func init() {

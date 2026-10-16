@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/release"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/release"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 // Context holds the machine-level state for kempt operations.

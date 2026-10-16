@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/release"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/release"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 // withContext overrides newContext for the duration of a test.

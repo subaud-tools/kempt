@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0
+
+- Module path is now github.com/subaud-tools/kempt; the source lives at github.com/subaud-tools/kempt.
+
 ## 0.6.1
 
 - `git-clone` accepts an existing checkout whose origin is the same repository over SSH (as `git@host:owner/repo`, or an `ssh://` URL as user `git` or none) or HTTPS. Only those plain forms are normalised: a remote with a non-default port, another SSH user, an absolute scp path, a percent-escape, query or fragment, a bare `host:path`, or a local path must match exactly. Before, one cloned over SSH under an HTTPS URL, or the reverse, showed as blocked on every run and stopped the rest of its package. `layer add` uses the same comparison for a checkout that already exists. (#41)

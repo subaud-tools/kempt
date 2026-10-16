@@ -6,10 +6,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/schuettc/kempt/internal/inventory"
-	"github.com/schuettc/kempt/internal/jsonutil"
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/inventory"
+	"github.com/subaud-tools/kempt/internal/jsonutil"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // CheckOrphans reports installed software (pi always, global npm only when

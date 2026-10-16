@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func withStatusStore(t *testing.T, dir string) func() {

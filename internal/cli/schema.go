@@ -3,7 +3,7 @@ package cli
 import (
 	"io"
 
-	"github.com/schuettc/kempt/internal/schema"
+	"github.com/subaud-tools/kempt/internal/schema"
 )
 
 func init() {

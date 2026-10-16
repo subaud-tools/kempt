@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	tools "github.com/schuettc/tools-common"
+	tools "github.com/subaud-tools/tools-common"
 )
 
 // This file holds the verified-atomic install primitive shared by the

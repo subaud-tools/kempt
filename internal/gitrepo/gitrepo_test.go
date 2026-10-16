@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/gitrepo"
-	"github.com/schuettc/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/gitrepo"
+	"github.com/subaud-tools/kempt/internal/run"
 )
 
 func newFake(responses map[string]run.Response) *run.FakeRunner {

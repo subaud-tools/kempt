@@ -4,8 +4,8 @@ import (
 	"flag"
 	"io"
 
-	"github.com/schuettc/kempt/internal/version"
-	tools "github.com/schuettc/tools-common"
+	"github.com/subaud-tools/kempt/internal/version"
+	tools "github.com/subaud-tools/tools-common"
 )
 
 // Command and UsageError are aliases onto the shared tools package so the

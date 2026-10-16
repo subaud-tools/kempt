@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/schuettc/kempt/internal/state"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func TestResolveManifest(t *testing.T) {

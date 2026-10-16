@@ -1,8 +1,8 @@
 package doctor
 
 import (
-	"github.com/schuettc/kempt/internal/machine"
-	"github.com/schuettc/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/manifest"
 )
 
 // Run executes every read-only check and returns their combined Report.
