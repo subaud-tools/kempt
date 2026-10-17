@@ -68,6 +68,6 @@ jobs:
           apple-notary-key-id: ${{ secrets.APPLE_NOTARY_KEY_ID }}
           apple-notary-issuer-id: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
           dl-tool: kempt
-          dl-role-arn: ${{ secrets.KEMPT_RELEASE_ROLE_ARN }}
-          dl-bucket: ${{ secrets.KEMPT_DOWNLOADS_BUCKET }}
+          dl-role-arn: ${{ vars.KEMPT_RELEASE_ROLE_ARN }}
+          dl-bucket: ${{ vars.KEMPT_DOWNLOADS_BUCKET }}
           dl-distribution-id: E309WZW10YNEN
