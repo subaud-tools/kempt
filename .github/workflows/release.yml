@@ -71,3 +71,18 @@ jobs:
           dl-role-arn: ${{ vars.KEMPT_RELEASE_ROLE_ARN }}
           dl-bucket: ${{ vars.KEMPT_DOWNLOADS_BUCKET }}
           dl-distribution-id: E309WZW10YNEN
+      # kempt.tools/spec/ follows the release (tools-ops kempt-spec-sync). Release
+      # candidates don't move it.
+      - if: steps.rel.outputs.skip != 'true' && steps.rel.outputs.prerelease != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.SUBAUD_TOOLS_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.SUBAUD_TOOLS_BOT_KEY }}
+          owner: subaud-tools
+          repositories: tools-ops
+      - if: steps.rel.outputs.skip != 'true' && steps.rel.outputs.prerelease != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG: ${{ steps.rel.outputs.tag }}
+        run: gh workflow run kempt-spec-sync.yml -R subaud-tools/tools-ops -f tag="$TAG"
