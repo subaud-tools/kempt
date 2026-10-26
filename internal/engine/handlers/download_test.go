@@ -287,8 +287,8 @@ func TestDownloadApplyGatedNotSignedInStartsTheSignIn(t *testing.T) {
 		st := manifest.DownloadStep{Site: "diazo.tools", Tool: "diazo", Bin: "diazo"}
 
 		err := (downloadHandler{}).Apply(ctx, st)
-		if err == nil || !strings.Contains(err.Error(), "type ABCD-EFGH") || !strings.Contains(err.Error(), "run `kempt apply` again") || strings.Contains(err.Error(), "run login again") {
-			t.Fatalf("err = %v, want the code and to run kempt apply again", err)
+		if err == nil || !strings.Contains(err.Error(), "type ABCD-EFGH") || !strings.Contains(err.Error(), "run `kempt login` once you've allowed this machine, then this command again") || strings.Contains(err.Error(), "kempt apply") {
+			t.Fatalf("err = %v, want the code and kempt login, which signs in whatever is installed", err)
 		}
 	}
 }
