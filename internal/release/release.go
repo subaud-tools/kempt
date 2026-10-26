@@ -156,9 +156,9 @@ func Fetch(r Releases, site, tool, path string) ([]byte, error) {
 	}
 	link, err := r.Link(tool, path)
 	if errors.Is(err, auth.ErrNotSignedIn) || errors.Is(err, auth.ErrSignInRefused) {
-		// Sign in in short steps: this apply starts it (or finishes one
-		// started earlier), and the next apply, once the machine is
-		// allowed, carries on.
+		// Sign in in short steps: this run starts it (or finishes one
+		// started earlier); once the machine is allowed, `kempt login`
+		// finishes it and the command carries on.
 		var out strings.Builder
 		if err := r.SignIn(&out); err != nil {
 			return nil, errors.New(applyAgain(err.Error()))
@@ -172,10 +172,13 @@ func Fetch(r Releases, site, tool, path string) ([]byte, error) {
 	return r.Download(link)
 }
 
-// applyAgain points tools-common's sign-in lines at the command the agent
-// actually runs again.
+// applyAgain points tools-common's sign-in lines at the command that will
+// finish signing in.
 func applyAgain(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "run login again", "run `kempt apply` again"))
+	// Not `kempt apply`: with the tool already installed it downloads nothing,
+	// so it never reaches the sign-in. `kempt login` always does.
+	s = strings.ReplaceAll(s, "run login again once you've allowed this machine.", "run `kempt login` once you've allowed this machine, then this command again.")
+	return strings.TrimSpace(strings.ReplaceAll(s, "run login again", "run `kempt login` again"))
 }
 
 // FakeReleases is an in-memory Releases for tests. Tags maps repo → tag,
