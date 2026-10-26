@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	neturl "net/url"
+	"os"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -22,6 +24,10 @@ type Releases interface {
 	// Link returns a signed URL of path in product's downloads, for a gated
 	// site whose /dl is closed to anyone.
 	Link(product, path string) (string, error)
+	// SignIn runs one short step of this machine's subaud.tools sign-in:
+	// it starts one (printing where to type the code) or finishes one
+	// already started, writing to out.
+	SignIn(out io.Writer) error
 }
 
 const defaultBase = "https://github.com"
@@ -87,6 +93,16 @@ func (r RealReleases) LatestTag(repo string) (string, error) {
 	return tag, nil
 }
 
+// SignIn runs one step of this machine's sign-in, named by its hostname.
+func (r RealReleases) SignIn(out io.Writer) error {
+	c := r.Auth
+	if c == nil {
+		c = &auth.Client{}
+	}
+	name, _ := os.Hostname()
+	return c.Login(context.Background(), name, runtime.GOOS, out)
+}
+
 // Link asks the access service for a five-minute signed URL of path in
 // product's downloads, with this machine's token.
 func (r RealReleases) Link(product, path string) (string, error) {
@@ -105,9 +121,15 @@ func (r RealReleases) Download(url string) ([]byte, error) {
 	if r.Client != nil {
 		c = r.Client
 	}
-	file := strings.SplitN(url, "?", 2)[0]
+	file, signed := url, false
+	if i := strings.IndexByte(url, '?'); i >= 0 {
+		file, signed = url[:i], true
+	}
 	resp, err := c.Get(url)
 	if err != nil {
+		if !signed {
+			return nil, err
+		}
 		var ue *neturl.Error
 		if errors.As(err, &ue) {
 			err = ue.Err
@@ -133,15 +155,27 @@ func Fetch(r Releases, site, tool, path string) ([]byte, error) {
 		return r.Download("https://" + site + "/dl/" + path)
 	}
 	link, err := r.Link(tool, path)
-	switch {
-	case errors.Is(err, auth.ErrNotSignedIn):
-		return nil, errors.New("this machine is not signed in to subaud.tools: run `kempt login`, then apply again")
-	case errors.Is(err, auth.ErrSignInRefused):
-		return nil, errors.New("subaud.tools refused this machine's sign-in: run `kempt login` to sign in again, then apply again")
-	case err != nil:
+	if errors.Is(err, auth.ErrNotSignedIn) || errors.Is(err, auth.ErrSignInRefused) {
+		// Sign in in short steps: this apply starts it (or finishes one
+		// started earlier), and the next apply, once the machine is
+		// allowed, carries on.
+		var out strings.Builder
+		if err := r.SignIn(&out); err != nil {
+			return nil, errors.New(applyAgain(err.Error()))
+		}
+		if link, err = r.Link(tool, path); err != nil {
+			return nil, errors.New(applyAgain("this machine is not signed in to subaud.tools yet.\n" + out.String()))
+		}
+	} else if err != nil {
 		return nil, err
 	}
 	return r.Download(link)
+}
+
+// applyAgain points tools-common's sign-in lines at the command the agent
+// actually runs again.
+func applyAgain(s string) string {
+	return strings.TrimSpace(strings.ReplaceAll(s, "run login again", "run `kempt apply` again"))
 }
 
 // FakeReleases is an in-memory Releases for tests. Tags maps repo → tag,
@@ -152,6 +186,13 @@ type FakeReleases struct {
 	Files   map[string][]byte
 	Links   map[string]string
 	LinkErr error
+	// SignInText is what SignIn prints; the sign-in never completes.
+	SignInText string
+}
+
+func (f FakeReleases) SignIn(out io.Writer) error {
+	_, err := io.WriteString(out, f.SignInText)
+	return err
 }
 
 func (f FakeReleases) LatestTag(repo string) (string, error) {

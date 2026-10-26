@@ -2,8 +2,10 @@ package release
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strings"
 	"testing"
 
@@ -145,5 +147,20 @@ func TestRealReleasesDownloadErrorHidesSignature(t *testing.T) {
 	_, err := rr.Download(srv.URL + "/dl/hail/latest?Signature=secret")
 	if err == nil || strings.Contains(err.Error(), "secret") || !strings.Contains(err.Error(), "/dl/hail/latest") {
 		t.Fatalf("err = %v, want the file named without its query", err)
+	}
+}
+
+// An ungated download keeps the error it always had; only a signed link's
+// query is kept out of the message.
+func TestDownloadErrorsKeepTheirFormUngatedAndHideASignature(t *testing.T) {
+	r := RealReleases{}
+	_, err := r.Download("http://127.0.0.1:1/dl/kempt/latest")
+	var ue *neturl.Error
+	if !errors.As(err, &ue) {
+		t.Fatalf("ungated: %v, want the *url.Error as before", err)
+	}
+	_, err = r.Download("http://127.0.0.1:1/dl/hail/latest?Signature=SECRET")
+	if err == nil || strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("signed: %v", err)
 	}
 }

@@ -281,14 +281,14 @@ func TestDownloadApplyGatedChecksumMismatch(t *testing.T) {
 	}
 }
 
-func TestDownloadApplyGatedNotSignedInNamesKemptLogin(t *testing.T) {
+func TestDownloadApplyGatedNotSignedInStartsTheSignIn(t *testing.T) {
 	for _, linkErr := range []error{auth.ErrNotSignedIn, auth.ErrSignInRefused} {
-		ctx := ghCtx(t, release.FakeReleases{LinkErr: linkErr})
+		ctx := ghCtx(t, release.FakeReleases{LinkErr: linkErr, SignInText: "Go to https://subaud.tools/account/machine and type ABCD-EFGH\nWaiting for approval: run login again once you've allowed this machine.\n"})
 		st := manifest.DownloadStep{Site: "diazo.tools", Tool: "diazo", Bin: "diazo"}
 
 		err := (downloadHandler{}).Apply(ctx, st)
-		if err == nil || !strings.Contains(err.Error(), "run `kempt login`") || strings.Contains(err.Error(), "<tool>") {
-			t.Fatalf("err = %v, want the sign-in line naming kempt login", err)
+		if err == nil || !strings.Contains(err.Error(), "type ABCD-EFGH") || !strings.Contains(err.Error(), "run `kempt apply` again") || strings.Contains(err.Error(), "run login again") {
+			t.Fatalf("err = %v, want the code and to run kempt apply again", err)
 		}
 	}
 }
