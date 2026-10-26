@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.9.1
+
+- A sign-in whose code expired before it was allowed is replaced in the same run, so the run always shows a code to type (tools-common v0.29.0).
+- With no sign-in, a gated download says to run `kempt login` once the machine is allowed, then the same command again. It said `kempt apply`, which downloads nothing when the tool is already installed, so it never reached the sign-in.
+
 ## 0.9.0
 
 - **Gated downloads.** hail.tools and diazo.tools are closing `/dl` to anyone. A `[[packages.x.download]]` step on either site now fetches `latest`, the tarball and its `.sha256` through five-minute signed links the subaud.tools access service gives this machine's token, with the step's tool as the product; `outdated` and `upgrade` read `latest` the same way. The sha256 check holds as before. Every other site is fetched plainly, as before. With no token, or one the service refuses, `apply` stops at that step and says to run `kempt login`, then apply again; a tool the account doesn't own names the account page.
