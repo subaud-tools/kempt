@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0
+
+- **Gated downloads.** hail.tools and diazo.tools are closing `/dl` to anyone. A `[[packages.x.download]]` step on either site now fetches `latest`, the tarball and its `.sha256` through five-minute signed links the subaud.tools access service gives this machine's token, with the step's tool as the product; `outdated` and `upgrade` read `latest` the same way. The sha256 check holds as before. Every other site is fetched plainly, as before. With no token, or one the service refuses, `apply` stops at that step and says to run `kempt login`, then apply again; a tool the account doesn't own names the account page.
+- `kempt login` and `kempt logout` (from tools-common 0.28.0): `login` signs the machine in to its subaud.tools account over two short runs, the first printing a code to type on the account page, the next saving the token once the machine is allowed; `--wait` does both in one run. The sign-in is shared by every subaud tool on the machine.
+- Built on tools-common v0.28.0 (was v0.12.0).
+- A failed download names its URL without the query, so a signed link's signature never reaches the output.
+
 ## 0.8.0
 
 - Module path is now github.com/subaud-tools/kempt; the source lives at github.com/subaud-tools/kempt.

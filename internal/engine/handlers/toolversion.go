@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/release"
 )
 
 // semverRe matches a bare semantic version, optionally with a prerelease
@@ -35,10 +36,11 @@ func InstalledToolVersion(ctx *machine.Context, bin string) (version string, kno
 // as opposed to the rolling "" / "latest".
 func IsPinnedVersion(v string) bool { return v != "" && v != "latest" }
 
-// LatestVersion reads the plain-text /dl/<tool>/latest pointer off the site.
+// LatestVersion reads the plain-text /dl/<tool>/latest pointer off the site,
+// through a signed link when the site is gated.
 // Network — callers must be an explicit outdated/upgrade path, never Inspect.
 func LatestVersion(ctx *machine.Context, site, tool string) (string, error) {
-	body, err := ctx.Releases.Download("https://" + site + "/dl/" + tool + "/latest")
+	body, err := release.Fetch(ctx.Releases, site, tool, tool+"/latest")
 	if err != nil {
 		return "", err
 	}

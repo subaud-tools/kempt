@@ -1,10 +1,15 @@
 package release
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	neturl "net/url"
 	"strings"
 	"testing"
+
+	"github.com/subaud-tools/tools-common/auth"
 )
 
 func TestRealReleasesLatestTag(t *testing.T) {
@@ -104,5 +109,58 @@ func TestFakeReleasesDownloadMissing(t *testing.T) {
 	}
 	if got := err.Error(); got == "" || !strings.Contains(got, "https://example.com/x") {
 		t.Fatalf("error %q should name the url", got)
+	}
+}
+
+func TestRealReleasesLinkAsksTheAccessService(t *testing.T) {
+	var got struct{ Product, Path, Auth string }
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/links" {
+			http.NotFound(w, r)
+			return
+		}
+		var in map[string]string
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		got.Product, got.Path, got.Auth = in["product"], in["path"], r.Header.Get("Authorization")
+		_, _ = w.Write([]byte(`{"url":"https://hail.tools/dl/hail/latest?Signature=x"}`))
+	}))
+	defer srv.Close()
+	t.Setenv(auth.TokenEnv, "tok")
+
+	rr := RealReleases{Auth: &auth.Client{API: srv.URL, HTTP: srv.Client()}}
+	u, err := rr.Link("hail", "hail/latest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if u != "https://hail.tools/dl/hail/latest?Signature=x" || got.Product != "hail" || got.Path != "hail/latest" || got.Auth != "Bearer tok" {
+		t.Fatalf("link %q, request %+v", u, got)
+	}
+}
+
+func TestRealReleasesDownloadErrorHidesSignature(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	rr := RealReleases{Client: srv.Client()}
+	_, err := rr.Download(srv.URL + "/dl/hail/latest?Signature=secret")
+	if err == nil || strings.Contains(err.Error(), "secret") || !strings.Contains(err.Error(), "/dl/hail/latest") {
+		t.Fatalf("err = %v, want the file named without its query", err)
+	}
+}
+
+// An ungated download keeps the error it always had; only a signed link's
+// query is kept out of the message.
+func TestDownloadErrorsKeepTheirFormUngatedAndHideASignature(t *testing.T) {
+	r := RealReleases{}
+	_, err := r.Download("http://127.0.0.1:1/dl/kempt/latest")
+	var ue *neturl.Error
+	if !errors.As(err, &ue) {
+		t.Fatalf("ungated: %v, want the *url.Error as before", err)
+	}
+	_, err = r.Download("http://127.0.0.1:1/dl/hail/latest?Signature=SECRET")
+	if err == nil || strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("signed: %v", err)
 	}
 }

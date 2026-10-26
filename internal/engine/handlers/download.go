@@ -8,6 +8,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/release"
 )
 
 func init() { engine.RegisterHandler(downloadHandler{}) }
@@ -18,6 +19,9 @@ func init() { engine.RegisterHandler(downloadHandler{}) }
 //	pointer: https://<site>/dl/<tool>/latest         -> body is the version
 //	asset:   https://<site>/dl/<tool>/<ver>/<tool>_<os>_<arch>.tar.gz
 //	sums:    <asset>.sha256
+//
+// On a gated site (release.GatedSites) each of the three is fetched through a
+// signed link instead, with the tool as the product.
 //
 // The asset is verified sha256 FAIL-CLOSED against its .sha256 sidecar and
 // landed atomically at <Home>/.local/bin/<Bin> via verifyExtractInstall.
@@ -72,14 +76,13 @@ func (downloadHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 	}
 
 	assetName := st.Tool + "_" + ctx.OS + "_" + ctx.Arch + ".tar.gz"
-	assetURL := "https://" + st.Site + "/dl/" + st.Tool + "/" + ver + "/" + assetName
-	sumsURL := assetURL + ".sha256"
+	assetPath := st.Tool + "/" + ver + "/" + assetName
 
-	assetBytes, err := ctx.Releases.Download(assetURL)
+	assetBytes, err := release.Fetch(ctx.Releases, st.Site, st.Tool, assetPath)
 	if err != nil {
 		return err
 	}
-	sumsBytes, err := ctx.Releases.Download(sumsURL)
+	sumsBytes, err := release.Fetch(ctx.Releases, st.Site, st.Tool, assetPath+".sha256")
 	if err != nil {
 		return err
 	}
