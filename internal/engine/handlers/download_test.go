@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/subaud-tools/kempt/internal/engine"
@@ -11,6 +12,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/manifest"
 	"github.com/subaud-tools/kempt/internal/release"
 	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/tools-common/auth"
 )
 
 // mustStatBinPresent makes os.Stat(binPath(ctx, bin)) succeed by creating the
@@ -222,5 +224,71 @@ func TestDownloadApplyChecksumMismatch(t *testing.T) {
 	entries, err := os.ReadDir(binDir)
 	if err == nil && len(entries) != 0 {
 		t.Fatalf("expected no files in %s, got %v", binDir, entries)
+	}
+}
+
+// gatedRel serves hail 1.4.0 only through signed links: each of the three
+// files is reachable at its link's URL, never at its /dl URL.
+func gatedRel(t *testing.T, sums []byte) (release.FakeReleases, []byte) {
+	t.Helper()
+	content := []byte("gated-binary")
+	tgz := makeTarGz(t, "hail", content)
+	assetName := "hail_linux_amd64.tar.gz"
+	if sums == nil {
+		sums = checksums(assetName, tgz)
+	}
+	return release.FakeReleases{
+		Links: map[string]string{
+			"hail hail/latest":                         "https://signed.example/latest?sig=s1",
+			"hail hail/1.4.0/" + assetName:             "https://signed.example/asset?sig=s2",
+			"hail hail/1.4.0/" + assetName + ".sha256": "https://signed.example/sums?sig=s3",
+		},
+		Files: map[string][]byte{
+			"https://signed.example/latest?sig=s1": []byte("1.4.0\n"),
+			"https://signed.example/asset?sig=s2":  tgz,
+			"https://signed.example/sums?sig=s3":   sums,
+		},
+	}, content
+}
+
+func TestDownloadApplyGatedFetchesThroughLinks(t *testing.T) {
+	rel, content := gatedRel(t, nil)
+	ctx := ghCtx(t, rel)
+	st := manifest.DownloadStep{Site: "hail.tools", Tool: "hail", Bin: "hail"}
+
+	if err := (downloadHandler{}).Apply(ctx, st); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(ctx.Home, ".local", "bin", "hail"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatalf("binary content mismatch: %q", got)
+	}
+}
+
+func TestDownloadApplyGatedChecksumMismatch(t *testing.T) {
+	rel, _ := gatedRel(t, checksums("hail_linux_amd64.tar.gz", []byte("other")))
+	ctx := ghCtx(t, rel)
+	st := manifest.DownloadStep{Site: "hail.tools", Tool: "hail", Bin: "hail"}
+
+	if err := (downloadHandler{}).Apply(ctx, st); err == nil {
+		t.Fatal("expected checksum mismatch error")
+	}
+	if _, err := os.Stat(filepath.Join(ctx.Home, ".local", "bin", "hail")); !os.IsNotExist(err) {
+		t.Fatalf("binary landed despite the mismatch: %v", err)
+	}
+}
+
+func TestDownloadApplyGatedNotSignedInNamesKemptLogin(t *testing.T) {
+	for _, linkErr := range []error{auth.ErrNotSignedIn, auth.ErrSignInRefused} {
+		ctx := ghCtx(t, release.FakeReleases{LinkErr: linkErr})
+		st := manifest.DownloadStep{Site: "diazo.tools", Tool: "diazo", Bin: "diazo"}
+
+		err := (downloadHandler{}).Apply(ctx, st)
+		if err == nil || !strings.Contains(err.Error(), "run `kempt login`") || strings.Contains(err.Error(), "<tool>") {
+			t.Fatalf("err = %v, want the sign-in line naming kempt login", err)
+		}
 	}
 }

@@ -94,3 +94,15 @@ func TestSemverMajorBump(t *testing.T) {
 		}
 	}
 }
+
+func TestLatestVersionGated(t *testing.T) {
+	rel := release.FakeReleases{
+		Links: map[string]string{"diazo diazo/latest": "https://signed.example/latest?sig=s"},
+		Files: map[string][]byte{"https://signed.example/latest?sig=s": []byte("0.3.0\n")},
+	}
+	ctx := ctxWith(nil, rel)
+	v, err := LatestVersion(ctx, "diazo.tools", "diazo")
+	if err != nil || v != "0.3.0" {
+		t.Fatalf("got (%q,%v), want (0.3.0,nil)", v, err)
+	}
+}
