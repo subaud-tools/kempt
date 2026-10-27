@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+
+- kempt moves to tools-common v0.30.0, where a tool's `update` asks a gated site's signed links for its `Config.Product`. kempt's is its own name, so nothing changes in use: `kempt update` still downloads anonymously from kempt.tools.
+
 ## 0.10.0
 
 - A `[[packages.x.download]]` step takes an optional `product`: what a gated site's signed links are asked for, when one product covers several tools (tackle's six say `product = "tackle"`). Without it the product is the step's `tool`, as before. `apply`, `outdated`, `upgrade` and `update`'s roll all ask for it; `kempt schema` and the spec list it.
