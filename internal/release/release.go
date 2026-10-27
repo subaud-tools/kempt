@@ -149,12 +149,12 @@ var GatedSites = []string{"hail.tools", "diazo.tools"}
 
 // Fetch downloads path (e.g. "hail/latest" or
 // "hail/0.4.0/hail_darwin_arm64.tar.gz") under site's /dl: through a signed
-// link with tool as the product when the site is gated, else plainly.
-func Fetch(r Releases, site, tool, path string) ([]byte, error) {
+// link of product when the site is gated, else plainly.
+func Fetch(r Releases, site, product, path string) ([]byte, error) {
 	if !slices.Contains(GatedSites, site) {
 		return r.Download("https://" + site + "/dl/" + path)
 	}
-	link, err := r.Link(tool, path)
+	link, err := r.Link(product, path)
 	if errors.Is(err, auth.ErrNotSignedIn) || errors.Is(err, auth.ErrSignInRefused) {
 		// Sign in in short steps: this run starts it (or finishes one
 		// started earlier); once the machine is allowed, `kempt login`
@@ -163,7 +163,7 @@ func Fetch(r Releases, site, tool, path string) ([]byte, error) {
 		if err := r.SignIn(&out); err != nil {
 			return nil, errors.New(applyAgain(err.Error()))
 		}
-		if link, err = r.Link(tool, path); err != nil {
+		if link, err = r.Link(product, path); err != nil {
 			return nil, errors.New(applyAgain("this machine is not signed in to subaud.tools yet.\n" + out.String()))
 		}
 	} else if err != nil {

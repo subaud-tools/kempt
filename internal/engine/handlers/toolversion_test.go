@@ -44,7 +44,7 @@ func TestLatestVersion(t *testing.T) {
 		"https://tackle.tools/dl/proj/latest": []byte("0.1.2\n"),
 	}}
 	ctx := ctxWith(nil, rel)
-	v, err := LatestVersion(ctx, "tackle.tools", "proj")
+	v, err := LatestVersion(ctx, "tackle.tools", "proj", "proj")
 	if err != nil || v != "0.1.2" {
 		t.Fatalf("got (%q,%v), want (0.1.2,nil)", v, err)
 	}
@@ -101,7 +101,7 @@ func TestLatestVersionGated(t *testing.T) {
 		Files: map[string][]byte{"https://signed.example/latest?sig=s": []byte("0.3.0\n")},
 	}
 	ctx := ctxWith(nil, rel)
-	v, err := LatestVersion(ctx, "diazo.tools", "diazo")
+	v, err := LatestVersion(ctx, "diazo.tools", "diazo", "diazo")
 	if err != nil || v != "0.3.0" {
 		t.Fatalf("got (%q,%v), want (0.3.0,nil)", v, err)
 	}

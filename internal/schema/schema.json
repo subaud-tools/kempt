@@ -146,6 +146,7 @@
       "properties": {
         "site": { "type": "string" },
         "tool": { "type": "string" },
+        "product": { "type": "string" },
         "version": { "type": "string" },
         "bin": { "type": "string" },
         "only": { "$ref": "#/$defs/only" }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -290,5 +291,37 @@ func TestDownloadApplyGatedNotSignedInStartsTheSignIn(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), "type ABCD-EFGH") || !strings.Contains(err.Error(), "run `kempt login` once you've allowed this machine, then this command again") || strings.Contains(err.Error(), "kempt apply") {
 			t.Fatalf("err = %v, want the code and kempt login, which signs in whatever is installed", err)
 		}
+	}
+}
+
+// gateSite makes site gated for the test.
+func gateSite(t *testing.T, site string) {
+	t.Helper()
+	orig := release.GatedSites
+	release.GatedSites = append(slices.Clone(orig), site)
+	t.Cleanup(func() { release.GatedSites = orig })
+}
+
+func TestDownloadApplyAsksForTheStepsProduct(t *testing.T) {
+	gateSite(t, "tackle.tools")
+	tgz := makeTarGz(t, "cull", []byte("cull-binary"))
+	assetName := "cull_linux_amd64.tar.gz"
+	rel := release.FakeReleases{
+		Links: map[string]string{
+			"tackle cull/latest":                         "https://signed.example/latest?sig=s1",
+			"tackle cull/1.4.0/" + assetName:             "https://signed.example/asset?sig=s2",
+			"tackle cull/1.4.0/" + assetName + ".sha256": "https://signed.example/sums?sig=s3",
+		},
+		Files: map[string][]byte{
+			"https://signed.example/latest?sig=s1": []byte("1.4.0\n"),
+			"https://signed.example/asset?sig=s2":  tgz,
+			"https://signed.example/sums?sig=s3":   checksums(assetName, tgz),
+		},
+	}
+	ctx := ghCtx(t, rel)
+	st := manifest.DownloadStep{Site: "tackle.tools", Tool: "cull", Product: "tackle", Bin: "cull"}
+
+	if err := (downloadHandler{}).Apply(ctx, st); err != nil {
+		t.Fatal(err)
 	}
 }

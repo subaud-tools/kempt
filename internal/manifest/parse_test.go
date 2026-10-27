@@ -173,3 +173,14 @@ notes = ["run codex login", "grant access"]
 		t.Fatalf("notes[1] = %q, want \"grant access\"", pkg.Notes[1])
 	}
 }
+
+func TestParseDownloadProduct(t *testing.T) {
+	src := []byte("[kempt]\nspec = 1\n[packages.tackle]\n[[packages.tackle.download]]\nsite = \"tackle.tools\"\ntool = \"cull\"\nproduct = \"tackle\"\nbin = \"cull\"\n")
+	m, findings := Parse(src)
+	if len(findings) != 0 {
+		t.Fatalf("findings: %v", findings)
+	}
+	if st := m.Packages["tackle"].Steps[0].(DownloadStep); st.Product != "tackle" {
+		t.Fatalf("product = %q, want tackle", st.Product)
+	}
+}

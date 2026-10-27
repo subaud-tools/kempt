@@ -7,8 +7,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/subaud-tools/kempt/internal/machine"
+	"github.com/subaud-tools/kempt/internal/release"
 )
 
 // fakeTarball builds a gzip'd tar containing a single file named name with
@@ -213,4 +217,60 @@ spec = 1
 	if strings.Contains(out.String(), "upgraded proj") {
 		t.Fatalf("decline should not have upgraded: %q", out.String())
 	}
+}
+
+// A step with a product asks the gated site's links for that product, both
+// resolving latest and installing what it resolved.
+func TestUpgradeAsksForTheStepsProduct(t *testing.T) {
+	orig := release.GatedSites
+	release.GatedSites = append(slices.Clone(orig), "tackle.tools")
+	t.Cleanup(func() { release.GatedSites = orig })
+	dir := writeTempManifest(t, `
+[kempt]
+spec = 1
+[packages.terminal]
+  [[packages.terminal.download]]
+  site = "tackle.tools"
+  tool = "cull"
+  product = "tackle"
+  bin = "cull"
+`)
+	asset, sum := fakeTarball(t, "cull", "0.1.2-binary-bytes")
+	restore, _ := stubContextRuns(t, dir, map[string]string{"cull version": "cull 0.1.1 (a, d)\n"}, nil, map[string]string{
+		"https://s/latest": "0.1.2\n",
+		"https://s/asset":  asset,
+		"https://s/sum":    sum,
+	})
+	t.Cleanup(restore)
+	withLinks(t, map[string]string{
+		"tackle cull/latest":                                "https://s/latest",
+		"tackle cull/0.1.2/cull_darwin_arm64.tar.gz":        "https://s/asset",
+		"tackle cull/0.1.2/cull_darwin_arm64.tar.gz.sha256": "https://s/sum",
+	})
+
+	var out, errw bytes.Buffer
+	if err := runUpgrade([]string{"-manifest", dir + "/kempt.toml", "-packages", "terminal", "-yes"}, &out, &errw); err != nil {
+		t.Fatalf("upgrade: %v (%s)", err, errw.String())
+	}
+	if !strings.Contains(out.String(), "upgraded cull to 0.1.2") {
+		t.Fatalf("got %q", out.String())
+	}
+}
+
+// withLinks adds signed links ("<product> <path>" → URL) to the stubbed
+// context's releases.
+func withLinks(t *testing.T, links map[string]string) {
+	t.Helper()
+	stubbed := newContext
+	newContext = func(dir string) (*machine.Context, error) {
+		ctx, err := stubbed(dir)
+		if err != nil {
+			return nil, err
+		}
+		rel := ctx.Releases.(release.FakeReleases)
+		rel.Links = links
+		ctx.Releases = rel
+		return ctx, nil
+	}
+	t.Cleanup(func() { newContext = stubbed })
 }

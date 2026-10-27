@@ -122,3 +122,16 @@ func TestKemptTableHasLayer(t *testing.T) {
 		t.Errorf("layer enum = %v; want [user project]", enum)
 	}
 }
+
+// TestDownloadStepHasProduct: a download step accepts the product the parser
+// reads, so an editor using the schema does not flag tackle's steps.
+func TestDownloadStepHasProduct(t *testing.T) {
+	var m map[string]any
+	if err := json.Unmarshal(JSON(), &m); err != nil {
+		t.Fatal(err)
+	}
+	props := m["$defs"].(map[string]any)["downloadStep"].(map[string]any)["properties"].(map[string]any)
+	if _, ok := props["product"]; !ok {
+		t.Fatal("downloadStep schema has no product property")
+	}
+}

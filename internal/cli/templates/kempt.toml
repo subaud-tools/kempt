@@ -63,7 +63,8 @@ only = { os = "darwin", arch = "arm64" }
 # download: fetch a binary from a domain distribution. kempt resolves the
 # version ("latest" by default, or pin one), downloads
 # https://<site>/dl/<tool>/<ver>/<tool>_<os>_<arch>.tar.gz, verifies its
-# .sha256 sidecar, and installs `bin` into ~/.local/bin.
+# .sha256 sidecar, and installs `bin` into ~/.local/bin. On a gated site,
+# `product` (default: `tool`) is what this machine's sign-in must own.
 [[packages.tools.download]]
 site = "example.tools"
 tool = "demo"
