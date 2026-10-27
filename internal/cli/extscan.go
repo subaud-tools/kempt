@@ -76,7 +76,7 @@ func rollRolling(ctx *machine.Context, selected []*manifest.Package, out io.Writ
 		}
 		var aerr error
 		if s.Kind == "download" {
-			aerr = h.Apply(ctx, manifest.DownloadStep{Site: s.Site, Tool: s.Tool, Version: s.Target, Bin: s.Bin})
+			aerr = h.Apply(ctx, manifest.DownloadStep{Site: s.Site, Tool: s.Tool, Product: s.Product, Version: s.Target, Bin: s.Bin})
 		} else {
 			aerr = handlers.RollExtensionTo(ctx, s.Ext, s.Target)
 		}

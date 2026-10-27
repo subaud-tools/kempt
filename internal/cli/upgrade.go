@@ -103,7 +103,7 @@ func runUpgrade(args []string, out, errw io.Writer) error {
 			// Version is the exact resolved target scanTools reported, so a
 			// "latest" tool installs the version just resolved (no second
 			// pointer read that could race a newer release).
-			step := manifest.DownloadStep{Site: s.Site, Tool: s.Tool, Version: s.Target, Bin: s.Bin}
+			step := manifest.DownloadStep{Site: s.Site, Tool: s.Tool, Product: s.Product, Version: s.Target, Bin: s.Bin}
 			if err := h.Apply(ctx, step); err != nil {
 				return fmt.Errorf("upgrade %s: %w", s.Tool, err)
 			}

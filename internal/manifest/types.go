@@ -1,5 +1,7 @@
 package manifest
 
+import "cmp"
+
 // Class is the safety class of a primitive step. It is a code constant derived
 // from the step kind, never a manifest field.
 type Class int
@@ -94,10 +96,14 @@ type GithubReleaseStep struct {
 type DownloadStep struct {
 	Site    string `toml:"site"`    // e.g. "tackle.tools"
 	Tool    string `toml:"tool"`    // e.g. "proj"
+	Product string `toml:"product"` // what /links is asked for on a gated site; "" → Tool
 	Version string `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
 	Bin     string `toml:"bin"`     // binary inside tarball + installed name
 	Only    *Only  `toml:"only"`
 }
+
+// ProductName is what the access service is asked for: Product, else Tool.
+func (s DownloadStep) ProductName() string { return cmp.Or(s.Product, s.Tool) }
 
 type GitCloneStep struct {
 	Repo string `toml:"repo"`

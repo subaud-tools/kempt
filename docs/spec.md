@@ -124,6 +124,16 @@ offline, and `apply` converges to the pinned version (including a downgrade if
 necessary). Version currency is managed separately via `kempt upgrade` and `kempt
 outdated`.
 
+### `download` product field
+
+On a gated site (one whose `/dl` is closed to anyone; kempt knows which), each
+file is fetched through a signed link the subaud.tools access service gives
+this machine's token, asked for a product and a path. The product is the
+step's `product`, or its `tool` when `product` is omitted. Set it when one
+product covers several tools: tackle's six each say `product = "tackle"`.
+`apply`, `outdated`, `upgrade` and the `kempt update` roll step all ask for it.
+An ungated site ignores it.
+
 Safety class comes from kempt's primitive table — a manifest cannot declare its
 own software installs "safe."
 

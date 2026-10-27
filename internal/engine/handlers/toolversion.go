@@ -37,10 +37,10 @@ func InstalledToolVersion(ctx *machine.Context, bin string) (version string, kno
 func IsPinnedVersion(v string) bool { return v != "" && v != "latest" }
 
 // LatestVersion reads the plain-text /dl/<tool>/latest pointer off the site,
-// through a signed link when the site is gated.
+// through a signed link of product when the site is gated.
 // Network — callers must be an explicit outdated/upgrade path, never Inspect.
-func LatestVersion(ctx *machine.Context, site, tool string) (string, error) {
-	body, err := release.Fetch(ctx.Releases, site, tool, tool+"/latest")
+func LatestVersion(ctx *machine.Context, site, product, tool string) (string, error) {
+	body, err := release.Fetch(ctx.Releases, site, product, tool+"/latest")
 	if err != nil {
 		return "", err
 	}

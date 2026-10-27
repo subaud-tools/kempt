@@ -68,7 +68,7 @@ func (downloadHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 
 	ver := st.Version
 	if !IsPinnedVersion(ver) {
-		latest, err := LatestVersion(ctx, st.Site, st.Tool)
+		latest, err := LatestVersion(ctx, st.Site, st.ProductName(), st.Tool)
 		if err != nil {
 			return err
 		}
@@ -78,11 +78,11 @@ func (downloadHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 	assetName := st.Tool + "_" + ctx.OS + "_" + ctx.Arch + ".tar.gz"
 	assetPath := st.Tool + "/" + ver + "/" + assetName
 
-	assetBytes, err := release.Fetch(ctx.Releases, st.Site, st.Tool, assetPath)
+	assetBytes, err := release.Fetch(ctx.Releases, st.Site, st.ProductName(), assetPath)
 	if err != nil {
 		return err
 	}
-	sumsBytes, err := release.Fetch(ctx.Releases, st.Site, st.Tool, assetPath+".sha256")
+	sumsBytes, err := release.Fetch(ctx.Releases, st.Site, st.ProductName(), assetPath+".sha256")
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+
+- A `[[packages.x.download]]` step takes an optional `product`: what a gated site's signed links are asked for, when one product covers several tools (tackle's six say `product = "tackle"`). Without it the product is the step's `tool`, as before. `apply`, `outdated`, `upgrade` and `update`'s roll all ask for it; `kempt schema` and the spec list it.
+
 ## 0.9.1
 
 - A sign-in whose code expired before it was allowed is replaced in the same run, so the run always shows a code to type (tools-common v0.29.0).
