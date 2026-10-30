@@ -10,7 +10,8 @@ import (
 
 // CheckRollup builds the plan for the selected packages and rolls its outcome
 // up into findings: one info when apply has pending changes, one error per
-// blocked plan step, and one error per verify step that fails or is blocked.
+// blocked plan step or pending managed file, and one error per verify step
+// that fails or is blocked. Managed files retain their package attribution.
 func CheckRollup(ctx *machine.Context, pkgs []*manifest.Package) []Finding {
 	var out []Finding
 	plan, err := engine.BuildPlan(ctx, pkgs)
@@ -23,6 +24,13 @@ func CheckRollup(ctx *machine.Context, pkgs []*manifest.Package) []Finding {
 			switch sr.Delta.Op {
 			case engine.OpChange:
 				pending++
+				if sr.Step.Kind() == "managed-file" {
+					out = append(out, Finding{
+						Check: "rollup", Package: pp.Name, Severity: Error,
+						Detail:      sr.Delta.Detail,
+						Remediation: "run `kempt apply` to converge",
+					})
+				}
 			case engine.OpBlocked:
 				out = append(out, Finding{
 					Check: "rollup", Package: pp.Name, Severity: Error,

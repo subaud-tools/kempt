@@ -53,16 +53,19 @@ repeating `-manifest`/`-profile`:
   auto-apply enabled it applies files-class changes only (never software).
 - **`kempt update`** - pull the repo, self-update the binary, roll rolling
   entries (unversioned `npm`/`pi` and `download version = "latest"`) to latest,
-  then converge (pinned entries to their pin). A major-version bump is held,
+  then converge (pinned entries to their pin). Opted-in downloads instead
+  show their binary and matching setup together before applying either. A
+  major-version bump is held,
   not rolled: `update` names it, and `kempt upgrade <name>` takes it.
 - **`kempt outdated`** - list installed tools and extensions with newer
   releases (offline for pinned versions; resolves latest over the network for
   rolling entries).
 - **`kempt upgrade [name…]`** - roll installed tools and extensions that are
   behind to latest, major releases included (marked as such in the list it
-  asks about). Prompts unless `-yes`. This, `outdated`, and the `update`
-  roll step are the only paths that reach the network for versions; `plan`/`apply`
-  never do.
+  asks about). Prompts unless `-yes`. Opted-in release setup is resolved online
+  before review in `init`, `apply`,
+  `update` and `upgrade`; `plan` reads its cached inputs offline. Binary-only
+  downloads retain their existing presence/pin inspection behavior.
 - **`kempt layer add <name> <git-url | path>`** / **`kempt layer add -project <dir>`**
   - apply a layer on top of the base on this machine: a work or personal
   manifest, one that never leaves the machine, or a project's own
@@ -73,13 +76,36 @@ repeating `-manifest`/`-profile`:
 - **`kempt doctor`** — diagnose machine-vs-manifest drift (read-only). Reports
   drift the `plan`/`verify` commands miss: undeclared live array entries,
   duplicate package identities, orphaned installs, broken/foreign managed
-  symlinks, and a `plan`/`verify` rollup. Exits non-zero when findings reach the
+  symlinks, missing/drifted release-managed files attributed to their packages,
+  and a `plan`/`verify` rollup. Exits non-zero when findings reach the
   failing threshold (`error` by default; `warn` under `-strict`). `-json` emits
   machine-readable findings.
 - **`kempt adopt <pkg>`** / **`kempt drop <pkg>`** — add or remove a package
   (and its needs) in the saved selection.
 - **`kempt config auto-apply-files [true|false]`** — get or set whether refresh
   auto-applies files-class changes.
+
+## Release-owned setup
+
+A participating release can supply its matching wrapper, multi-file skills,
+merges and other declarative integration. In a `spec = 2` manifest add
+`setup = true` to that tool's `[[packages.<name>.download]]` block. See the
+[full opt-in and publisher contract](docs/spec.md#release-owned-setup-spec-2).
+Only opt in once the producer publishes the checksummed bundle; this engine
+release does not mean all tools have migrated.
+
+`apply` resolves and verifies binary plus setup before showing the plan; `plan`
+uses the cached declaration and reports unresolved setup instead of claiming a
+complete plan. Apply uses that invocation's frozen inputs, even if `latest`
+changes while you review. A later apply resolves again. Repeat unchanged setup
+converges without rewriting ownership records. Foreign files and local edits
+are preserved as visible conflicts, not overwritten. Partial failures remain
+incomplete and are repaired through the ordinary plan/apply path. No executable
+installer is invoked to discover setup.
+
+Spec 1 manifests remain supported. Files-only refresh will not apply candidate
+setup ahead of its matching binary. Hook/plugin-specific reconciliation and
+migration of the family's declarations are separate work, not included here.
 
 ## Commands
 
