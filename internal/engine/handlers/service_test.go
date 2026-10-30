@@ -24,6 +24,8 @@ func serviceHandler(t *testing.T) engine.Handler {
 func svcCtx(t *testing.T, r run.Runner, uid int) *machine.Context {
 	t.Helper()
 	tmp := t.TempDir()
+	t.Setenv("HOME", tmp)
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	return &machine.Context{
 		Home:    tmp,
 		RepoDir: tmp,

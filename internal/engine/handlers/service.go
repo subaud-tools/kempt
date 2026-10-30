@@ -10,6 +10,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 func init() { engine.RegisterHandler(serviceHandlerImpl{}) }
@@ -172,6 +173,17 @@ func (serviceHandlerImpl) Inspect(ctx *machine.Context, s manifest.Step) (engine
 	if string(cur) != want {
 		return engine.Delta{Op: engine.OpChange, Detail: base + " (update agent)"}, nil
 	}
+	store, err := state.DefaultStore()
+	if err != nil {
+		return engine.Delta{}, err
+	}
+	pending, err := store.PendingServiceActivation(serviceActivation(ctx, st, want))
+	if err != nil {
+		return engine.Delta{}, err
+	}
+	if pending {
+		return engine.Delta{Op: engine.OpChange, Detail: base + " (retry pending activation)"}, nil
+	}
 	return engine.Delta{Op: engine.OpNoop, Detail: base}, nil
 }
 
@@ -180,18 +192,30 @@ func (serviceHandlerImpl) Apply(ctx *machine.Context, s manifest.Step) error {
 	want := renderPlist(ctx, st)
 	path := plistPathFor(ctx, st.Label)
 
-	// Determine whether the on-disk content already matches. When it does,
-	// applying is a no-op: no write, no reload.
+	store, err := state.DefaultStore()
+	if err != nil {
+		return err
+	}
+	activation := serviceActivation(ctx, st, want)
+	pending, err := store.PendingServiceActivation(activation)
+	if err != nil {
+		return err
+	}
+
+	// Identical bytes are complete only when no activation is pending.
 	cur, err := os.ReadFile(path)
 	switch {
 	case err == nil:
-		if string(cur) == want {
+		if string(cur) == want && !pending {
 			return nil
 		}
 	case !os.IsNotExist(err):
 		return err
 	}
 
+	if err := store.RecordServiceActivation(activation); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
@@ -206,5 +230,9 @@ func (serviceHandlerImpl) Apply(ctx *machine.Context, s manifest.Step) error {
 	if _, err := ctx.Runner.Run("launchctl", "bootstrap", domain, path); err != nil {
 		return err
 	}
-	return nil
+	return store.ClearServiceActivation(activation)
+}
+
+func serviceActivation(ctx *machine.Context, st manifest.ServiceStep, want string) state.ServiceActivation {
+	return state.ServiceActivation{Label: st.Label, Path: plistPathFor(ctx, st.Label), UID: ctx.UID, Digest: digest([]byte(want))}
 }
