@@ -114,8 +114,27 @@ func runUpdate(app *tools.App, args []string, out, errw io.Writer) error {
 
 	// Legacy rolling sources keep their update behavior, but run only after
 	// the release-owned binary and integration changes have been displayed.
-	if err := rollRolling(ctx, legacySelected, out); err != nil {
-		return err
+	rolled := rollRolling(ctx, legacySelected, out)
+
+	// Legacy rolls are outside Execute. Refresh only their verification results;
+	// keep every mutating operation frozen to the plan displayed before the roll.
+	for i := range plan.Packages {
+		pp := &plan.Packages[i]
+		if !rolled[pp.Name] || pp.Skipped {
+			continue
+		}
+		for j := range pp.Steps {
+			sr := &pp.Steps[j]
+			if sr.Step.Kind() != "verify" || sr.Delta.Op == engine.OpSkip {
+				continue
+			}
+			h, ok := engine.HandlerFor("verify")
+			if ok {
+				if delta, err := h.Inspect(engine.ContextFor(ctx, pp.Root), sr.Step); err == nil {
+					sr.Delta = delta
+				}
+			}
+		}
 	}
 
 	applied, failed := executeAndVerify(ctx, plan, out)

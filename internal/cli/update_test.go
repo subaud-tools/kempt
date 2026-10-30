@@ -233,9 +233,7 @@ spec = 1
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := rollRolling(ctx, selected, &out); err != nil {
-		t.Fatal(err)
-	}
+	rollRolling(ctx, selected, &out)
 	if !strings.Contains(out.String(), "rolled pi-creel to 0.1.1") {
 		t.Errorf("missing roll line:\n%s", out.String())
 	}
@@ -279,9 +277,7 @@ spec = 1
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := rollRolling(ctx, selected, &out); err != nil {
-		t.Fatal(err)
-	}
+	rollRolling(ctx, selected, &out)
 	want := "skipping pi-hail: still at 0.1.1 after the roll (latest 0.7.0)\nrolling: 1 checked, 0 rolled, 1 skipped, 0 held\n"
 	if got := out.String(); got != want {
 		t.Errorf("output = %q; want %q", got, want)
@@ -317,9 +313,7 @@ spec = 1
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := rollRolling(ctx, selected, &out); err != nil {
-		t.Fatal(err)
-	}
+	rollRolling(ctx, selected, &out)
 	want := "held pi-mcp-adapter 2.38.0 -> 3.2.0 (major release): run kempt upgrade pi-mcp-adapter\n" +
 		"rolled pi-creel to 0.2.0\n" +
 		"rolling: 2 checked, 1 rolled, 0 skipped, 1 held\n"
@@ -355,9 +349,7 @@ spec = 1
 		t.Fatal(err)
 	}
 	var out bytes.Buffer
-	if err := rollRolling(ctx, selected, &out); err != nil {
-		t.Fatal(err)
-	}
+	rollRolling(ctx, selected, &out)
 	if got := out.String(); got != "rolling: 2 checked, 0 rolled, 0 skipped, 0 held\n" {
 		t.Errorf("output = %q", got)
 	}
