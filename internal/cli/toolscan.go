@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
@@ -47,6 +48,7 @@ func loadSelectedContext(manifestFlag, profileFlag, packagesFlag string, out, er
 
 // toolStatus is one download tool's version standing.
 type toolStatus struct {
+	Package         string // declaring package, for post-roll verification
 	Tool, Bin, Site string
 	Product         string // the download step's product; "" → Tool
 	// Kind is "download" | "pi" | "npm". Ext carries the extension identity for
@@ -86,8 +88,16 @@ func scanTools(ctx *machine.Context, selected []*manifest.Package) []toolStatus 
 			if !ok {
 				continue
 			}
+			if st.Setup {
+				if _, skip := engine.OnlySkip(ctx, pkg.Only); skip {
+					continue
+				}
+				if _, skip := engine.OnlySkip(ctx, st.Only); skip {
+					continue
+				}
+			}
 			installed, known := handlers.InstalledToolVersion(ctx, st.Bin)
-			ts := toolStatus{Kind: "download", Tool: st.Tool, Product: st.Product, Bin: st.Bin, Site: st.Site, Installed: installed, Known: known}
+			ts := toolStatus{Package: pkg.Name, Kind: "download", Tool: st.Tool, Product: st.Product, Bin: st.Bin, Site: st.Site, Installed: installed, Known: known}
 			if handlers.IsPinnedVersion(st.Version) {
 				ts.Mode = "pinned"
 				ts.Target = st.Version

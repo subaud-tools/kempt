@@ -134,3 +134,12 @@ func readFile(path string) ([]byte, bool, error) {
 func atomicWrite(dir, name string, data []byte) error {
 	return tools.WriteFileAtomic(filepath.Join(dir, name), data, 0o644)
 }
+
+// ResolvedRelease identifies the immutable inputs reviewed for a release.
+type ResolvedRelease struct {
+	Site         string `json:"site"`
+	Product      string `json:"product"`
+	Tool         string `json:"tool"`
+	Version      string `json:"version"`
+	BundleDigest string `json:"bundle_digest"`
+}

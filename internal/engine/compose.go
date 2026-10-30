@@ -62,7 +62,9 @@ func compose(ctx *machine.Context, in []*manifest.Package) (*composed, error) {
 	if err := resolveExclusive(ctx, pkgs); err != nil {
 		return nil, err
 	}
-	c.foldMerges(ctx)
+	gates := setupMergeGates(ctx, pkgs)
+	slots := c.foldMerges(ctx)
+	c.gateSetupMerges(ctx, gates, slots)
 	return c, nil
 }
 
@@ -150,6 +152,9 @@ func exclusiveKey(ctx *machine.Context, s manifest.Step) (key string, norm any, 
 		// naming the same relative from are different links.
 		st.From = ctx.Expand(st.From)
 		return "symlink " + st.To, st, true
+	case manifest.ManagedFileStep:
+		st.To = ctx.Expand(st.To)
+		return "managed-file " + st.To, st, true
 	case manifest.GitCloneStep:
 		return "git-clone " + st.To, st, true
 	case manifest.DownloadStep:
@@ -219,7 +224,7 @@ type mergeGroup struct {
 // keeps its entry and converging is idempotent), and when anything is left in
 // the append fold the replace fold moves after it. Files one layer merges alone keep
 // their steps exactly as written.
-func (c *composed) foldMerges(ctx *machine.Context) {
+func (c *composed) foldMerges(ctx *machine.Context) map[mergeRef]int {
 	pkgs := c.pkgs
 	groups := map[string]*mergeGroup{}
 	var order []string
@@ -341,7 +346,7 @@ func (c *composed) foldMerges(ctx *machine.Context) {
 			move[at] = after
 		}
 	}
-	c.rebuild(remove, move)
+	return c.rebuild(remove, move)
 }
 
 // pruneRemoved applies, for every json-merge file folded from two or more
@@ -540,7 +545,8 @@ func (c *composed) setNote(r mergeRef, note string) {
 
 // rebuild drops the folded-away steps and moves each replace fold after its
 // append anchor, re-keying the notes to the steps' final positions.
-func (c *composed) rebuild(remove map[mergeRef]bool, move map[mergeRef]mergeRef) {
+func (c *composed) rebuild(remove map[mergeRef]bool, move map[mergeRef]mergeRef) map[mergeRef]int {
+	slots := map[mergeRef]int{}
 	type moved struct {
 		step manifest.Step
 		note string
@@ -564,6 +570,7 @@ func (c *composed) rebuild(remove map[mergeRef]bool, move map[mergeRef]mergeRef)
 		}
 		for si, s := range p.Steps {
 			r := mergeRef{pi, si}
+			slots[r] = len(steps)
 			if !remove[r] {
 				add(s, c.notes[pi][si])
 			}
@@ -574,6 +581,7 @@ func (c *composed) rebuild(remove map[mergeRef]bool, move map[mergeRef]mergeRef)
 		p.Steps = steps
 	}
 	c.notes = notes
+	return slots
 }
 
 // foldGroup combines a group's merge documents in order: maps deep-merge,
@@ -655,4 +663,100 @@ func combine(acc, next any, path, layer string, setBy map[string]string, overrid
 		setBy[path] = layer
 		return next
 	}
+}
+
+// A folded merge may contain a release contribution even when its original
+// position belonged to the base. Keep the existing merge policy, but schedule
+// that whole file after every contributing release's parent has succeeded.
+type setupMergeGate struct {
+	pkg   int
+	step  int
+	needs []string
+}
+
+func mergeFile(ctx *machine.Context, s manifest.Step) string {
+	switch st := s.(type) {
+	case manifest.JSONMergeStep:
+		return ctx.Expand(st.File)
+	case manifest.TomlMergeStep:
+		return ctx.Expand(st.File)
+	}
+	return ""
+}
+func setupMergeGates(ctx *machine.Context, pkgs []*manifest.Package) map[string]setupMergeGate {
+	gates := map[string]setupMergeGate{}
+	for i, p := range pkgs {
+		if p.SetupParent == "" {
+			continue
+		}
+		for j, s := range p.Steps {
+			if !active(ctx, p, s) {
+				continue
+			}
+			file := mergeFile(ContextFor(ctx, p.Root), s)
+			if file == "" {
+				continue
+			}
+			g, exists := gates[file]
+			if !exists || g.pkg != i {
+				g.step = j
+			}
+			g.pkg = i
+			g.needs = unionStrings(g.needs, p.Needs)
+			gates[file] = g
+		}
+	}
+	return gates
+}
+
+// Reinsert each gated merge at its original target-fragment slot, even when
+// folding removed that declaration. Slots are measured before removing the
+// surviving folds, so services and other consumers retain their declared order.
+func (c *composed) gateSetupMerges(ctx *machine.Context, gates map[string]setupMergeGate, slots map[mergeRef]int) {
+	type pending struct {
+		step manifest.Step
+		note string
+	}
+	moved := map[mergeRef][]pending{}
+	remove := map[mergeRef]bool{}
+	for i, p := range c.pkgs {
+		for j, s := range p.Steps {
+			file := mergeFile(ContextFor(ctx, p.Root), s)
+			g, ok := gates[file]
+			if !ok || !active(ctx, p, s) {
+				continue
+			}
+			switch st := s.(type) {
+			case manifest.JSONMergeStep:
+				st.File = file
+				s = st
+			case manifest.TomlMergeStep:
+				st.File = file
+				s = st
+			}
+			at := mergeRef{g.pkg, slots[mergeRef{g.pkg, g.step}]}
+			moved[at] = append(moved[at], pending{s, c.notes[i][j]})
+			remove[mergeRef{i, j}] = true
+			target := c.pkgs[g.pkg]
+			target.Needs = unionStrings(target.Needs, g.needs)
+		}
+	}
+	notes := map[int]map[int]string{}
+	for i, p := range c.pkgs {
+		var steps []manifest.Step
+		notes[i] = map[int]string{}
+		for j := 0; j <= len(p.Steps); j++ {
+			at := mergeRef{i, j}
+			for _, m := range moved[at] {
+				notes[i][len(steps)] = m.note
+				steps = append(steps, m.step)
+			}
+			if j < len(p.Steps) && !remove[at] {
+				notes[i][len(steps)] = c.notes[i][j]
+				steps = append(steps, p.Steps[j])
+			}
+		}
+		p.Steps = steps
+	}
+	c.notes = notes
 }

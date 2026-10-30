@@ -25,7 +25,7 @@ func scanExtensions(ctx *machine.Context, selected []*manifest.Package) []toolSt
 			}
 			for _, e := range handlers.RollingExtensions(is) {
 				installed, known := handlers.ExtInstalledVersion(ctx, e)
-				ts := toolStatus{Kind: e.Backend, Tool: e.Pkg, Ext: e, Mode: "latest", Installed: installed, Known: known}
+				ts := toolStatus{Package: pkg.Name, Kind: e.Backend, Tool: e.Pkg, Ext: e, Mode: "latest", Installed: installed, Known: known}
 				latest, err := handlers.ExtLatest(ctx, e)
 				if err != nil {
 					ts.Err = err
@@ -50,8 +50,10 @@ func scanExtensions(ctx *machine.Context, selected []*manifest.Package) []toolSt
 // can break a working setup. Pinned entries are handled by the offline
 // converge that follows, not here. It always ends with a one-line summary
 // (checked/rolled/skipped/held) so a run with nothing behind is still visible.
-func rollRolling(ctx *machine.Context, selected []*manifest.Package, out io.Writer) error {
-	statuses := scanTools(ctx, selected)
+// The returned set names only packages with a successfully rolled entry.
+func rollRolling(ctx *machine.Context, selected []*manifest.Package, out io.Writer) map[string]bool {
+	changed := map[string]bool{}
+	statuses := scanTools(ctx, withoutSetup(selected))
 	statuses = append(statuses, scanExtensions(ctx, selected)...)
 
 	h, _ := engine.HandlerFor("download")
@@ -87,7 +89,8 @@ func rollRolling(ctx *machine.Context, selected []*manifest.Package, out io.Writ
 		}
 		_, _ = fmt.Fprintf(out, "rolled %s to %s\n", s.Tool, s.Target)
 		rolled++
+		changed[s.Package] = true
 	}
 	_, _ = fmt.Fprintf(out, "rolling: %d checked, %d rolled, %d skipped, %d held\n", checked, rolled, skipped, held)
-	return nil
+	return changed
 }

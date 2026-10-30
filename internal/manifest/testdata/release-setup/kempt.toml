@@ -1,0 +1,15 @@
+[kempt]
+spec = 2
+[packages.integration]
+[[packages.integration.managed-file]]
+from = "proj.zsh"
+to = "~/.config/zsh/proj.zsh"
+mode = "0644"
+[[packages.integration.managed-file]]
+from = "skills/proj/SKILL.md"
+to = "~/.claude/skills/proj/SKILL.md"
+mode = "0644"
+[[packages.integration.managed-file]]
+from = "skills/proj/reference.md"
+to = "~/.claude/skills/proj/reference.md"
+mode = "0644"

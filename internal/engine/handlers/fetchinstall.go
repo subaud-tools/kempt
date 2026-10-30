@@ -103,3 +103,16 @@ func verifyExtractInstall(assetName string, assetBytes []byte, sumsBytes []byte,
 	}
 	return stageAndRename(destDir, bin, binBytes)
 }
+
+// VerifyAsset checks a release asset without extracting or writing it.
+func VerifyAsset(name string, data, sums []byte) error {
+	want, err := checksumHex(sums, name)
+	if err != nil {
+		return err
+	}
+	got := sha256.Sum256(data)
+	if hex.EncodeToString(got[:]) != want {
+		return fmt.Errorf("checksum mismatch for %s", name)
+	}
+	return nil
+}

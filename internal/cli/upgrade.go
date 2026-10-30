@@ -8,6 +8,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/setup"
 )
 
 func init() {
@@ -62,11 +63,67 @@ func runUpgrade(args []string, out, errw io.Writer) error {
 		return err
 	}
 	statuses := scanTools(ctx, selected)
+	// Opted-in releases use a frozen, combined plan. Exact scan targets also
+	// retain upgrade's explicit major-release approval rather than rolling holds; the cache remains keyed by the original pin.
+	var setupSelected []*manifest.Package
+	setupTools := map[string]bool{}
+	for _, pkg := range selected {
+		p := *pkg
+		p.Steps = nil
+		for _, step := range pkg.Steps {
+			d, ok := step.(manifest.DownloadStep)
+			if !ok || !d.Setup {
+				continue
+			}
+			if _, skip := engine.OnlySkip(ctx, pkg.Only); skip {
+				continue
+			}
+			if _, skip := engine.OnlySkip(ctx, d.Only); skip {
+				continue
+			}
+			setupTools[d.Site+"/"+d.Tool+"/"+d.Bin] = true
+			if len(only) > 0 && !only[d.Tool] {
+				continue
+			}
+			for _, status := range statuses {
+				if status.Site != d.Site || status.Tool != d.Tool || status.Bin != d.Bin {
+					continue
+				}
+				if status.Err != nil {
+					return fmt.Errorf("resolve %s: %w", d.Tool, status.Err)
+				}
+				if status.Behind {
+					d.CandidateVersion = status.Target
+					p.Steps = append(p.Steps, d)
+				}
+			}
+		}
+		if len(p.Steps) > 0 {
+			setupSelected = append(setupSelected, &p)
+		}
+	}
+	setupSelected, err = setup.Prepare(ctx, setupSelected, true)
+	if err != nil {
+		return err
+	}
+	setupPlan, err := engine.BuildPlan(ctx, setupSelected)
+	if err != nil {
+		return err
+	}
+	if len(setupSelected) > 0 {
+		engine.Render(setupPlan, out, false)
+		if err := blockedReleaseSetup(setupPlan, false); err != nil {
+			return err
+		}
+	}
 
 	statuses = append(statuses, scanExtensions(ctx, selected)...)
 
 	var todo []toolStatus
 	for _, s := range statuses {
+		if s.Kind == "download" && setupTools[s.Site+"/"+s.Tool+"/"+s.Bin] {
+			continue
+		}
 		if len(only) != 0 && !only[s.Tool] {
 			continue
 		}
@@ -78,7 +135,7 @@ func runUpgrade(args []string, out, errw io.Writer) error {
 			todo = append(todo, s)
 		}
 	}
-	if len(todo) == 0 {
+	if len(todo) == 0 && countChanges(setupPlan) == 0 {
 		_, _ = fmt.Fprintln(out, "everything up to date")
 		return nil
 	}
@@ -97,6 +154,12 @@ func runUpgrade(args []string, out, errw io.Writer) error {
 		}
 	}
 
+	if len(setupSelected) > 0 {
+		_, failed := executeAndVerify(ctx, setupPlan, out)
+		if failed > 0 || countBlocked(setupPlan) > 0 {
+			return fmt.Errorf("release setup upgrade incomplete")
+		}
+	}
 	h, _ := engine.HandlerFor("download")
 	for _, s := range todo {
 		if s.Kind == "download" {

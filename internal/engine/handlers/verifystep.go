@@ -29,6 +29,9 @@ func (verifyStepHandler) Kind() string { return "verify" }
 
 func (verifyStepHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.Delta, error) {
 	st := s.(manifest.VerifyStep)
+	if st.Offline && (st.HTTPOk != "" || st.VersionCurrent != nil) {
+		return engine.Delta{Op: engine.OpBlocked, Detail: "verify: release setup network check unresolved offline; run kempt apply"}, nil
+	}
 
 	var details []string
 	blocked := false

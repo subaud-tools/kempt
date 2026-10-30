@@ -6,6 +6,7 @@ package engine
 import (
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/state"
 )
 
 // Op is the outcome of inspecting a step against the current machine state.
@@ -54,12 +55,15 @@ type StepResult struct {
 
 // PackagePlan is the plan for one package.
 type PackagePlan struct {
-	Name    string
-	Skipped bool   // whole package filtered by only
-	Detail  string // skip reason when Skipped (e.g. "os != darwin")
-	Steps   []StepResult
-	Notes   []string
-	Layer   string // declaring layer, "" for the base
+	Needs       []string
+	Resolved    *state.ResolvedRelease
+	SetupParent string
+	Name        string
+	Skipped     bool   // whole package filtered by only
+	Detail      string // skip reason when Skipped (e.g. "os != darwin")
+	Steps       []StepResult
+	Notes       []string
+	Layer       string // declaring layer, "" for the base
 	// Overrides lists the entries this package's layer took over from an
 	// earlier layer; always rendered, since they change what converges.
 	Overrides []string

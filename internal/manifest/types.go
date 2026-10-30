@@ -1,6 +1,9 @@
 package manifest
 
-import "cmp"
+import (
+	"cmp"
+	"github.com/subaud-tools/kempt/internal/state"
+)
 
 // Class is the safety class of a primitive step. It is a code constant derived
 // from the step kind, never a manifest field.
@@ -32,6 +35,8 @@ type DoctorConfig struct {
 }
 
 type Package struct {
+	Resolved    *state.ResolvedRelease
+	SetupParent string
 	Name        string
 	Description string
 	Needs       []string
@@ -94,12 +99,21 @@ type GithubReleaseStep struct {
 }
 
 type DownloadStep struct {
-	Site    string `toml:"site"`    // e.g. "tackle.tools"
-	Tool    string `toml:"tool"`    // e.g. "proj"
-	Product string `toml:"product"` // what /links is asked for on a gated site; "" → Tool
-	Version string `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
-	Bin     string `toml:"bin"`     // binary inside tarball + installed name
-	Only    *Only  `toml:"only"`
+	// CandidateVersion is upgrade's exact reviewed target, not a manifest pin.
+	CandidateVersion string                 `toml:"-" json:"-"`
+	Held             string                 `toml:"-" json:"-"`
+	Resolved         *state.ResolvedRelease `toml:"-" json:"-"`
+	Asset, Checksums []byte                 `toml:"-" json:"-"`
+	ResolutionError  string                 `toml:"-" json:"-"`
+	Site             string                 `toml:"site"`    // e.g. "tackle.tools"
+	Tool             string                 `toml:"tool"`    // e.g. "proj"
+	Product          string                 `toml:"product"` // what /links is asked for on a gated site; "" → Tool
+	Version          string                 `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
+	Bin              string                 `toml:"bin"`     // binary inside tarball + installed name
+	// Setup (spec 2) opts in to the release's setup bundle: its
+	// [packages.integration] fragment joins the plan at this version.
+	Setup bool  `toml:"setup"`
+	Only  *Only `toml:"only"`
 }
 
 // ProductName is what the access service is asked for: Product, else Tool.
@@ -125,6 +139,25 @@ type ServiceStep struct {
 	StartInterval    *int              `toml:"start-interval"` // StartInterval seconds: a periodic job (requires keep-alive = false)
 	SessionType      string            `toml:"session-type"`   // LimitLoadToSessionType, e.g. "Aqua"
 	Only             *Only             `toml:"only"`
+}
+
+// ManagedFileStep (spec 2) writes one release-owned file: From is a regular
+// file relative to the verified setup bundle's files/, To the destination
+// (~ and relative paths expand as for other steps), Mode "0644" or "0755".
+type ManagedFileStep struct {
+	From string `toml:"from"`
+	To   string `toml:"to"`
+	Mode string `toml:"mode"`
+	Only *Only  `toml:"only"`
+	// Source is From's bytes in the verified setup bundle, set by BindSetup
+	// and never by a manifest; nil means no verified bundle supplied it.
+	Source *SetupSource `toml:"-" json:"-"`
+}
+
+// SetupSource is a managed file's content and the release that supplied it.
+type SetupSource struct {
+	Tool, Version string
+	Data          []byte
 }
 
 type SymlinkStep struct {
@@ -155,6 +188,8 @@ type LineInFileStep struct {
 }
 
 type VerifyStep struct {
+	// Offline marks a cached release check whose remote inputs cannot be read.
+	Offline          bool                `toml:"-" json:"-"`
 	CommandExists    string              `toml:"command-exists"`
 	CommandExistsAny []string            `toml:"command-exists-any"`
 	HTTPOk           string              `toml:"http-ok"`
@@ -190,6 +225,9 @@ func (ServiceStep) Class() Class { return ClassSoftware }
 
 func (SymlinkStep) Kind() string { return "symlink" }
 func (SymlinkStep) Class() Class { return ClassFiles }
+
+func (ManagedFileStep) Kind() string { return "managed-file" }
+func (ManagedFileStep) Class() Class { return ClassFiles }
 
 func (JSONMergeStep) Kind() string { return "json-merge" }
 func (JSONMergeStep) Class() Class { return ClassFiles }

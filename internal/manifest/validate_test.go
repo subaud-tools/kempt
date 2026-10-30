@@ -45,7 +45,8 @@ func TestValidateBadOS(t *testing.T) {
 }
 
 func TestValidateSpecVersion(t *testing.T) {
-	f := findingsFor(t, "[kempt]\nspec = 2\n")
+	// Spec 2 (release setup) is supported; the next version is not.
+	f := findingsFor(t, "[kempt]\nspec = 3\n")
 	if len(f) != 1 || !strings.Contains(f[0].Msg, "unsupported spec") {
 		t.Fatalf("got %v", f)
 	}

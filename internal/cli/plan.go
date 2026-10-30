@@ -9,6 +9,7 @@ import (
 	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/run"
+	"github.com/subaud-tools/kempt/internal/setup"
 )
 
 func init() {
@@ -73,6 +74,10 @@ func runPlan(args []string, out, errw io.Writer) error {
 	}
 	if *v.arch != "" {
 		ctx.Arch = *v.arch
+	}
+	selected, err = setup.Prepare(ctx, selected, false)
+	if err != nil {
+		return err
 	}
 	plan, err := engine.BuildPlan(ctx, selected)
 	if err != nil {

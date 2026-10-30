@@ -12,6 +12,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/engine"
 	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/setup"
 )
 
 func init() {
@@ -84,6 +85,11 @@ func runDoctor(args []string, out, errw io.Writer) error {
 	selected, err := selectWithLayers(ctx, m, profile, packages, st, savedSelection(existed, *v.manifest, *v.profile, *v.packages), out, errw)
 	if err != nil {
 		return UsageError{Msg: err.Error()}
+	}
+
+	selected, err = setup.Prepare(ctx, selected, false)
+	if err != nil {
+		return err
 	}
 
 	var cfg manifest.DoctorConfig
