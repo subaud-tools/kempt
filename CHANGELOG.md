@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.12.0
 
 - Spec 2 adds per-download `setup = true` and release-owned `managed-file` declarations. Spec 1 remains supported; unsupported schema versions are rejected. Uses tools-common v0.37.0.
 - Prepare checksummed binary/setup pairs before review in init/apply/update/upgrade; offline setup inspection uses cached declarations and reports unresolved inputs. Applied assets are frozen to the reviewed release; rolling major holds remain explicit.
