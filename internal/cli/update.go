@@ -16,6 +16,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/layers"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/setup"
 	"github.com/subaud-tools/kempt/internal/state"
 	"github.com/subaud-tools/kempt/internal/version"
 	tools "github.com/subaud-tools/tools-common"
@@ -96,21 +97,31 @@ func runUpdate(app *tools.App, args []string, out, errw io.Writer) error {
 		return UsageError{Msg: err.Error()}
 	}
 
-	// 4. Roll rolling entries (unversioned npm/pi and download version=latest)
-	// to newest, so update lands the machine on latest for rolling entries and
-	// the pin for pinned ones. Network path; best-effort per entry.
-	if err := rollRolling(ctx, selected, out); err != nil {
+	// 4. Resolve and show the combined plan before any selected tool rolls.
+	legacySelected := withoutSetup(selected)
+	selected, err = setup.Prepare(ctx, selected, true)
+	if err != nil {
 		return err
 	}
-
-	// 5. Converge config from the freshly-pulled repo.
 	plan, err := engine.BuildPlan(ctx, selected)
 	if err != nil {
 		return err
 	}
 	engine.Render(plan, out, *verbose)
+	if err := blockedReleaseSetup(plan, false); err != nil {
+		return err
+	}
+
+	// Legacy rolling sources keep their update behavior, but run only after
+	// the release-owned binary and integration changes have been displayed.
+	if err := rollRolling(ctx, legacySelected, out); err != nil {
+		return err
+	}
 
 	applied, failed := executeAndVerify(ctx, plan, out)
+	if err := blockedReleaseSetup(plan, true); err != nil {
+		return err
+	}
 	blocked := countBlocked(plan)
 	_, _ = fmt.Fprintf(out, "%d applied, %d failed\n", applied, failed)
 	if blocked > 0 {

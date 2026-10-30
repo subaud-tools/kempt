@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,6 +35,9 @@ func (downloadHandler) Kind() string { return "download" }
 
 func (downloadHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.Delta, error) {
 	st := s.(manifest.DownloadStep)
+	if st.Setup && st.Resolved == nil {
+		return engine.Delta{Op: engine.OpBlocked, Detail: fmt.Sprintf("setup for %s is not resolved; run kempt apply: %s", st.Bin, st.ResolutionError)}, nil
+	}
 	bin := binPath(ctx, st.Bin)
 
 	if _, err := os.Stat(bin); err == nil {
@@ -42,7 +46,25 @@ func (downloadHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.De
 		// probe, no Releases call). "latest" tools stay presence-only so plan
 		// never churns when upstream releases.
 		if IsPinnedVersion(st.Version) {
-			if installed, known := InstalledToolVersion(ctx, st.Bin); known && installed != st.Version {
+			installed, known := InstalledToolVersion(ctx, st.Bin)
+			if st.Setup && !known {
+				// A dev/unknown executable is not proof of the cached identity.
+				// Exact verified bytes also establish identity after a fresh install
+				// when a local version probe is unavailable.
+				name := st.Tool + "_" + ctx.OS + "_" + ctx.Arch + ".tar.gz"
+				want, err := extractBinary(name, st.Asset, st.Bin)
+				if err != nil {
+					return engine.Delta{}, err
+				}
+				got, readErr := os.ReadFile(bin)
+				if readErr != nil {
+					return engine.Delta{}, readErr
+				}
+				if !bytes.Equal(want, got) {
+					return engine.Delta{Op: engine.OpChange, Detail: fmt.Sprintf("install %s (%s; installed release unknown)", st.Bin, st.Version)}, nil
+				}
+			}
+			if known && installed != st.Version {
 				return engine.Delta{
 					Op:     engine.OpChange,
 					Detail: fmt.Sprintf("upgrade %s %s -> %s", st.Bin, installed, st.Version),
@@ -66,6 +88,13 @@ func (downloadHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.De
 func (downloadHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 	st := s.(manifest.DownloadStep)
 
+	if st.Setup {
+		if st.Resolved == nil {
+			return fmt.Errorf("setup for %s is not resolved; run kempt apply", st.Bin)
+		}
+		name := st.Tool + "_" + ctx.OS + "_" + ctx.Arch + ".tar.gz"
+		return verifyExtractInstall(name, st.Asset, st.Checksums, st.Bin, filepath.Dir(binPath(ctx, st.Bin)))
+	}
 	ver := st.Version
 	if !IsPinnedVersion(ver) {
 		latest, err := LatestVersion(ctx, st.Site, st.ProductName(), st.Tool)

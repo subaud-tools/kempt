@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
@@ -85,6 +86,14 @@ func scanTools(ctx *machine.Context, selected []*manifest.Package) []toolStatus 
 			st, ok := step.(manifest.DownloadStep)
 			if !ok {
 				continue
+			}
+			if st.Setup {
+				if _, skip := engine.OnlySkip(ctx, pkg.Only); skip {
+					continue
+				}
+				if _, skip := engine.OnlySkip(ctx, st.Only); skip {
+					continue
+				}
 			}
 			installed, known := handlers.InstalledToolVersion(ctx, st.Bin)
 			ts := toolStatus{Kind: "download", Tool: st.Tool, Product: st.Product, Bin: st.Bin, Site: st.Site, Installed: installed, Known: known}

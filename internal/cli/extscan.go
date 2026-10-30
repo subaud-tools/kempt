@@ -51,7 +51,7 @@ func scanExtensions(ctx *machine.Context, selected []*manifest.Package) []toolSt
 // converge that follows, not here. It always ends with a one-line summary
 // (checked/rolled/skipped/held) so a run with nothing behind is still visible.
 func rollRolling(ctx *machine.Context, selected []*manifest.Package, out io.Writer) error {
-	statuses := scanTools(ctx, selected)
+	statuses := scanTools(ctx, withoutSetup(selected))
 	statuses = append(statuses, scanExtensions(ctx, selected)...)
 
 	h, _ := engine.HandlerFor("download")

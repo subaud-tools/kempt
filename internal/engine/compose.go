@@ -62,7 +62,9 @@ func compose(ctx *machine.Context, in []*manifest.Package) (*composed, error) {
 	if err := resolveExclusive(ctx, pkgs); err != nil {
 		return nil, err
 	}
+	gates := setupMergeGates(ctx, pkgs)
 	c.foldMerges(ctx)
+	c.gateSetupMerges(ctx, gates)
 	return c, nil
 }
 
@@ -150,6 +152,9 @@ func exclusiveKey(ctx *machine.Context, s manifest.Step) (key string, norm any, 
 		// naming the same relative from are different links.
 		st.From = ctx.Expand(st.From)
 		return "symlink " + st.To, st, true
+	case manifest.ManagedFileStep:
+		st.To = ctx.Expand(st.To)
+		return "managed-file " + st.To, st, true
 	case manifest.GitCloneStep:
 		return "git-clone " + st.To, st, true
 	case manifest.DownloadStep:
@@ -655,4 +660,85 @@ func combine(acc, next any, path, layer string, setBy map[string]string, overrid
 		setBy[path] = layer
 		return next
 	}
+}
+
+// A folded merge may contain a release contribution even when its original
+// position belonged to the base. Keep the existing merge policy, but schedule
+// that whole file after every contributing release's parent has succeeded.
+type setupMergeGate struct {
+	pkg   int
+	needs []string
+}
+
+func mergeFile(ctx *machine.Context, s manifest.Step) string {
+	switch st := s.(type) {
+	case manifest.JSONMergeStep:
+		return ctx.Expand(st.File)
+	case manifest.TomlMergeStep:
+		return ctx.Expand(st.File)
+	}
+	return ""
+}
+func setupMergeGates(ctx *machine.Context, pkgs []*manifest.Package) map[string]setupMergeGate {
+	gates := map[string]setupMergeGate{}
+	for i, p := range pkgs {
+		if p.SetupParent == "" {
+			continue
+		}
+		for _, s := range p.Steps {
+			if !active(ctx, p, s) {
+				continue
+			}
+			file := mergeFile(ContextFor(ctx, p.Root), s)
+			if file == "" {
+				continue
+			}
+			g := gates[file]
+			g.pkg = i
+			g.needs = unionStrings(g.needs, p.Needs)
+			gates[file] = g
+		}
+	}
+	return gates
+}
+func (c *composed) gateSetupMerges(ctx *machine.Context, gates map[string]setupMergeGate) {
+	type pending struct {
+		step manifest.Step
+		note string
+	}
+	moved := map[int][]pending{}
+	notes := map[int]map[int]string{}
+	for i, p := range c.pkgs {
+		var keep []manifest.Step
+		notes[i] = map[int]string{}
+		for j, s := range p.Steps {
+			file := mergeFile(ContextFor(ctx, p.Root), s)
+			g, ok := gates[file]
+			if ok && active(ctx, p, s) {
+				switch st := s.(type) {
+				case manifest.JSONMergeStep:
+					st.File = file
+					s = st
+				case manifest.TomlMergeStep:
+					st.File = file
+					s = st
+				}
+				moved[g.pkg] = append(moved[g.pkg], pending{s, c.notes[i][j]})
+				target := c.pkgs[g.pkg]
+				target.Needs = unionStrings(target.Needs, g.needs)
+				continue
+			}
+			notes[i][len(keep)] = c.notes[i][j]
+			keep = append(keep, s)
+		}
+		p.Steps = keep
+	}
+	for i, steps := range moved {
+		p := c.pkgs[i]
+		for _, s := range steps {
+			notes[i][len(p.Steps)] = s.note
+			p.Steps = append(p.Steps, s.step)
+		}
+	}
+	c.notes = notes
 }

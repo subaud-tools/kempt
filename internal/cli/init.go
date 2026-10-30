@@ -15,6 +15,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/gitrepo"
 	"github.com/subaud-tools/kempt/internal/manifest"
 	"github.com/subaud-tools/kempt/internal/picker"
+	"github.com/subaud-tools/kempt/internal/setup"
 	"github.com/subaud-tools/kempt/internal/state"
 )
 
@@ -179,14 +180,24 @@ func runInit(args []string, out, errw io.Writer) error {
 	if err != nil {
 		return UsageError{Msg: err.Error()}
 	}
+	selected, err = setup.Prepare(ctx, selected, true)
+	if err != nil {
+		return err
+	}
 	plan, err := engine.BuildPlan(ctx, selected)
 	if err != nil {
 		return err
 	}
 	engine.Render(plan, out, *v.verbose)
+	if err := blockedReleaseSetup(plan, false); err != nil {
+		return err
+	}
 
 	changes := countChanges(plan)
 	if changes == 0 {
+		if err := blockedReleaseSetup(plan, true); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintln(out, "nothing to do")
 		return nil
 	}
@@ -204,6 +215,9 @@ func runInit(args []string, out, errw io.Writer) error {
 	}
 
 	applied, failed := executeAndVerify(ctx, plan, out)
+	if err := blockedReleaseSetup(plan, true); err != nil {
+		return err
+	}
 	blocked := countBlocked(plan)
 	_, _ = fmt.Fprintf(out, "%d applied, %d failed\n", applied, failed)
 	if blocked > 0 {

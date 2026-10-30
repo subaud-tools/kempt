@@ -1,6 +1,9 @@
 package manifest
 
-import "cmp"
+import (
+	"cmp"
+	"github.com/subaud-tools/kempt/internal/state"
+)
 
 // Class is the safety class of a primitive step. It is a code constant derived
 // from the step kind, never a manifest field.
@@ -32,6 +35,8 @@ type DoctorConfig struct {
 }
 
 type Package struct {
+	Resolved    *state.ResolvedRelease
+	SetupParent string
 	Name        string
 	Description string
 	Needs       []string
@@ -94,11 +99,17 @@ type GithubReleaseStep struct {
 }
 
 type DownloadStep struct {
-	Site    string `toml:"site"`    // e.g. "tackle.tools"
-	Tool    string `toml:"tool"`    // e.g. "proj"
-	Product string `toml:"product"` // what /links is asked for on a gated site; "" → Tool
-	Version string `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
-	Bin     string `toml:"bin"`     // binary inside tarball + installed name
+	// CandidateVersion is upgrade's exact reviewed target, not a manifest pin.
+	CandidateVersion string                 `toml:"-" json:"-"`
+	Held             string                 `toml:"-" json:"-"`
+	Resolved         *state.ResolvedRelease `toml:"-" json:"-"`
+	Asset, Checksums []byte                 `toml:"-" json:"-"`
+	ResolutionError  string                 `toml:"-" json:"-"`
+	Site             string                 `toml:"site"`    // e.g. "tackle.tools"
+	Tool             string                 `toml:"tool"`    // e.g. "proj"
+	Product          string                 `toml:"product"` // what /links is asked for on a gated site; "" → Tool
+	Version          string                 `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
+	Bin              string                 `toml:"bin"`     // binary inside tarball + installed name
 	// Setup (spec 2) opts in to the release's setup bundle: its
 	// [packages.integration] fragment joins the plan at this version.
 	Setup bool  `toml:"setup"`
@@ -177,6 +188,8 @@ type LineInFileStep struct {
 }
 
 type VerifyStep struct {
+	// Offline marks a cached release check whose remote inputs cannot be read.
+	Offline          bool                `toml:"-" json:"-"`
 	CommandExists    string              `toml:"command-exists"`
 	CommandExistsAny []string            `toml:"command-exists-any"`
 	HTTPOk           string              `toml:"http-ok"`

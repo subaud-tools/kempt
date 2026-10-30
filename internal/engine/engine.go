@@ -21,7 +21,7 @@ func BuildPlan(ctx *machine.Context, pkgs []*manifest.Package) (*Plan, error) {
 	}
 	p := &Plan{}
 	for pi, pkg := range c.pkgs {
-		pp := PackagePlan{Name: pkg.Name, Notes: pkg.Notes, Layer: pkg.Layer, Root: pkg.Root, Overrides: c.overrides[pi]}
+		pp := PackagePlan{Needs: pkg.Needs, Resolved: pkg.Resolved, SetupParent: pkg.SetupParent, Name: pkg.Name, Notes: pkg.Notes, Layer: pkg.Layer, Root: pkg.Root, Overrides: c.overrides[pi]}
 		pctx := ContextFor(ctx, pkg.Root)
 		if reason, skip := skipReason(ctx, pkg.Only); skip {
 			pp.Skipped = true
@@ -30,6 +30,9 @@ func BuildPlan(ctx *machine.Context, pkgs []*manifest.Package) (*Plan, error) {
 			continue
 		}
 		for si, step := range pkg.Steps {
+			if d, ok := step.(manifest.DownloadStep); ok && d.Held != "" {
+				pp.Overrides = append(pp.Overrides, d.Held)
+			}
 			if reason, skip := skipReason(ctx, stepOnly(step)); skip {
 				pp.Steps = append(pp.Steps, StepResult{
 					Step:  step,
@@ -78,10 +81,33 @@ func ContextFor(ctx *machine.Context, root string) *machine.Context {
 // of that package, and continues with the next package. It returns the number of
 // failed steps.
 func Execute(ctx *machine.Context, p *Plan, out io.Writer) (failed int) {
+	incomplete := map[string]bool{}
 	for i := range p.Packages {
 		pp := &p.Packages[i]
 		if pp.Skipped {
 			continue
+		}
+		blockedBy := ""
+		for _, need := range pp.Needs {
+			if incomplete[need] {
+				blockedBy = need
+				break
+			}
+		}
+		if blockedBy != "" {
+			incomplete[pp.Name] = true
+			for j := range pp.Steps {
+				if pp.Steps[j].Delta.Op == OpChange {
+					pp.Steps[j].Delta = Delta{Op: OpBlocked, Detail: "dependency " + blockedBy + " is incomplete"}
+				}
+			}
+			_, _ = fmt.Fprintf(out, "! %s: blocked by incomplete dependency %s\n", pp.Name, blockedBy)
+			continue
+		}
+		for _, sr := range pp.Steps {
+			if sr.Delta.Op == OpBlocked && sr.Step.Kind() != "verify" {
+				incomplete[pp.Name] = true
+			}
 		}
 		pctx := ContextFor(ctx, pp.Root)
 		for j := range pp.Steps {
@@ -95,6 +121,7 @@ func Execute(ctx *machine.Context, p *Plan, out io.Writer) (failed int) {
 			}
 			if err := h.Apply(pctx, sr.Step); err != nil {
 				sr.Err = err
+				incomplete[pp.Name] = true
 				_, _ = fmt.Fprintf(out, "! %s: %s: %v\n", pp.Name, sr.Delta.Detail, err)
 				failed++
 				break
@@ -112,9 +139,31 @@ func Execute(ctx *machine.Context, p *Plan, out io.Writer) (failed int) {
 // is used by refresh to apply files-class changes without touching software.
 func FilterByClass(p *Plan, class manifest.Class) *Plan {
 	out := &Plan{}
+	held := map[string]bool{}
+	for _, pp := range p.Packages {
+		for _, sr := range pp.Steps {
+			if (sr.Delta.Op == OpBlocked && sr.Step.Kind() != "verify") || (sr.Delta.Op == OpChange && sr.Step.Class() != class) {
+				held[pp.Name] = true
+			}
+		}
+		for _, need := range pp.Needs {
+			if held[need] {
+				held[pp.Name] = true
+			}
+		}
+	}
 	for i := range p.Packages {
 		pp := &p.Packages[i]
 		if pp.Skipped {
+			continue
+		}
+		dependencyHeld := false
+		for _, need := range pp.Needs {
+			if held[need] {
+				dependencyHeld = true
+			}
+		}
+		if dependencyHeld {
 			continue
 		}
 		var steps []StepResult
@@ -131,7 +180,8 @@ func FilterByClass(p *Plan, class manifest.Class) *Plan {
 			continue
 		}
 		out.Packages = append(out.Packages, PackagePlan{
-			Name:    pp.Name,
+			Name:  pp.Name,
+			Needs: pp.Needs, Resolved: pp.Resolved, SetupParent: pp.SetupParent,
 			Skipped: pp.Skipped,
 			Detail:  pp.Detail,
 			Steps:   steps,
@@ -178,6 +228,10 @@ func stepOnly(s manifest.Step) *manifest.Only {
 	case manifest.InstallStep:
 		return v.Only
 	case manifest.GithubReleaseStep:
+		return v.Only
+	case manifest.DownloadStep:
+		return v.Only
+	case manifest.TomlMergeStep:
 		return v.Only
 	case manifest.GitCloneStep:
 		return v.Only

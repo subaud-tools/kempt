@@ -12,6 +12,7 @@ import (
 	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/gitrepo"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/setup"
 	"github.com/subaud-tools/kempt/internal/state"
 )
 
@@ -91,6 +92,10 @@ func runRefresh(args []string, out, errw io.Writer) error {
 	selected, err := selectWithLayers(ctx, m, "", st.Packages, st, savedSelection(existed, *v.manifest, "", ""), out, errw)
 	if err != nil {
 		return UsageError{Msg: err.Error()}
+	}
+	selected, err = setup.Prepare(ctx, selected, false)
+	if err != nil {
+		return err
 	}
 	plan, err := engine.BuildPlan(ctx, selected)
 	if err != nil {

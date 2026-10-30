@@ -12,6 +12,7 @@ import (
 	_ "github.com/subaud-tools/kempt/internal/engine/handlers"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
+	"github.com/subaud-tools/kempt/internal/setup"
 )
 
 func init() {
@@ -110,6 +111,10 @@ func runApply(args []string, out, errw io.Writer) error {
 	if err != nil {
 		return UsageError{Msg: err.Error()}
 	}
+	selected, err = setup.Prepare(ctx, selected, true)
+	if err != nil {
+		return err
+	}
 	plan, err := engine.BuildPlan(ctx, selected)
 	if err != nil {
 		return err
@@ -117,9 +122,15 @@ func runApply(args []string, out, errw io.Writer) error {
 
 	// Show the same plan `kempt plan` would.
 	engine.Render(plan, out, *v.verbose)
+	if err := blockedReleaseSetup(plan, false); err != nil {
+		return err
+	}
 
 	changes := countChanges(plan)
 	if changes == 0 {
+		if err := blockedReleaseSetup(plan, true); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintln(out, "nothing to do")
 		return nil
 	}
@@ -133,6 +144,9 @@ func runApply(args []string, out, errw io.Writer) error {
 	}
 
 	applied, failed := executeAndVerify(ctx, plan, out)
+	if err := blockedReleaseSetup(plan, true); err != nil {
+		return err
+	}
 
 	blocked := countBlocked(plan)
 	_, _ = fmt.Fprintf(out, "%d applied, %d failed\n", applied, failed)
@@ -190,7 +204,7 @@ func executeAndVerify(ctx *machine.Context, plan *engine.Plan, out io.Writer) (i
 			// the same package installed the thing being verified this run, that
 			// stale OpBlocked is a false positive — re-inspect it against post-apply
 			// state so the run's blocked count reflects reality.
-			if ok && pkgChanged && sr.Delta.Op == engine.OpBlocked && sr.Step.Kind() == "verify" {
+			if ok && (pkgChanged || pp.Resolved != nil) && sr.Delta.Op == engine.OpBlocked && sr.Step.Kind() == "verify" {
 				if delta, err := h.Inspect(pctx, sr.Step); err == nil {
 					sr.Delta = delta
 				}
