@@ -181,6 +181,35 @@ func TestManagedFileWithoutBundleIsBlocked(t *testing.T) {
 
 // Each file of a multi-file skill is its own step; a sibling the user added
 // in the skill's directory is left alone.
+// A tool-installed skill can be adopted using the shared installer's ownership rule.
+func TestManagedFileAdoptsToolInstalledSkill(t *testing.T) {
+	ctx := managedCtx(t)
+	dir := filepath.Join(ctx.Home, ".claude/skills/proj")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(dir, "SKILL.md")
+	if err := os.WriteFile(dest, []byte("---\nname: proj\n---\nold\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	s := bound("skills/proj/SKILL.md", "~/.claude/skills/proj/SKILL.md", "0644", "---\nname: proj\n---\nnew\n")
+	if d := inspect(t, ctx, s); d.Op != engine.OpChange {
+		t.Fatalf("inspect = %v %q, want adoption change", d.Op, d.Detail)
+	}
+	converge(t, ctx, s)
+	if got := readString(t, dest); got != "---\nname: proj\n---\nnew\n" {
+		t.Fatalf("content = %q", got)
+	}
+
+	if err := os.WriteFile(dest, []byte("---\nname: other\n---\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	if d := inspect(t, ctx, s); d.Op != engine.OpBlocked {
+		t.Fatalf("another skill: inspect = %v %q, want blocked", d.Op, d.Detail)
+	}
+}
+
 func TestManagedFileMultiFileSkillPreservesSiblings(t *testing.T) {
 	ctx := managedCtx(t)
 	dir := filepath.Join(ctx.Home, ".claude/skills/proj")

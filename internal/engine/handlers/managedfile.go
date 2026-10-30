@@ -8,9 +8,11 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	tools "github.com/subaud-tools/tools-common"
+	"github.com/subaud-tools/tools-common/skills"
 
 	"github.com/subaud-tools/kempt/internal/engine"
 	"github.com/subaud-tools/kempt/internal/machine"
@@ -23,8 +25,9 @@ func init() { engine.RegisterHandler(managedFileHandler{}) }
 // managedFileHandler realises the desired state: ctx.Expand(To) holds the
 // bytes BindSetup took from the verified setup bundle, with Mode. It writes a
 // destination only when it is missing or holds what kempt last wrote there
-// for the same tool (recorded under kempt's state directory); content already
-// identical is adopted without a write. Anything else is shown blocked, never
+// for the same tool (recorded under kempt's state directory), or is a SKILL.md
+// the tool's own installer wrote. Content already identical is adopted without
+// a write. Anything else is shown blocked, never
 // overwritten. It touches no other file, so a skill directory's other files
 // stay as they are.
 type managedFileHandler struct{}
@@ -141,8 +144,17 @@ func planManagedFile(ctx *machine.Context, st manifest.ManagedFileStep) (managed
 		return say(engine.OpChange, "update content, mode "+st.Mode)
 	case recorded:
 		return say(engine.OpBlocked, "changed since kempt wrote it: not overwriting")
+	case toolSkill(dest, cur, a.data):
+		a.write = true
+		return say(engine.OpChange, fmt.Sprintf("adopt %s's installed skill, update content, mode %s", filepath.Base(filepath.Dir(dest)), st.Mode))
 	}
 	return say(engine.OpBlocked, "content is not kempt's: not overwriting")
+}
+
+// toolSkill uses the shared installer's ownership rule for both versions.
+func toolSkill(dest string, cur, want []byte) bool {
+	name := filepath.Base(filepath.Dir(dest))
+	return filepath.Base(dest) == "SKILL.md" && skills.Owns(name, cur) && skills.Owns(name, want)
 }
 
 // digest is the hex sha256 of b.
