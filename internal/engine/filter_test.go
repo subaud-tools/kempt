@@ -68,3 +68,11 @@ func TestFilterByClassSoftware(t *testing.T) {
 		t.Fatalf("kept = %q, want sw1", got.Packages[0].Steps[0].Delta.Detail)
 	}
 }
+
+// A managed-file step's only-clause is honoured like any other step's.
+func TestStepOnlyReadsManagedFile(t *testing.T) {
+	only := &manifest.Only{OS: "linux"}
+	if got := StepOnly(manifest.ManagedFileStep{From: "f", To: "~/f", Mode: "0644", Only: only}); got != only {
+		t.Fatalf("StepOnly = %v, want the step's only-clause", got)
+	}
+}

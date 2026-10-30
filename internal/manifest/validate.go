@@ -17,6 +17,7 @@ func Validate(m *Manifest) []Finding {
 	findings = append(findings, validateOnly(m)...)
 	findings = append(findings, validateProfiles(m)...)
 	findings = append(findings, validateStepFields(m)...)
+	findings = append(findings, validateSpec2Syntax(m)...)
 	findings = append(findings, validateInstallSettingsPackages(m)...)
 	findings = append(findings, validateLayer(m)...)
 	return findings
@@ -31,9 +32,10 @@ func sortedPackageNames(m *Manifest) []string {
 	return names
 }
 
-// Rule 1: spec must be exactly 1.
+// Rule 1: spec must be 1 or 2. Spec 2 adds release setup (DownloadStep.Setup
+// and managed-file); validateSpec2Syntax rejects them in a spec 1 file.
 func validateSpec(m *Manifest) []Finding {
-	if m.Spec != 1 {
+	if m.Spec != 1 && m.Spec != 2 {
 		return []Finding{{
 			Path: "kempt.spec",
 			Msg:  fmt.Sprintf("unsupported spec version %d", m.Spec),
@@ -181,6 +183,8 @@ func stepOnly(s Step) *Only {
 		return v.Only
 	case SymlinkStep:
 		return v.Only
+	case ManagedFileStep:
+		return v.Only
 	case JSONMergeStep:
 		return v.Only
 	case TomlMergeStep:
@@ -245,6 +249,10 @@ func missingFields(s Step) []string {
 	case SymlinkStep:
 		req(v.From != "", "from")
 		req(v.To != "", "to")
+	case ManagedFileStep:
+		req(v.From != "", "from")
+		req(v.To != "", "to")
+		req(v.Mode != "", "mode")
 	case GithubReleaseStep:
 		req(v.Repo != "", "repo")
 		req(v.Asset != "", "asset")
@@ -390,6 +398,15 @@ func validateStepFields(m *Manifest) []Finding {
 							Msg:  fmt.Sprintf("remove path %q has an empty key", r),
 						})
 					}
+				}
+			}
+			if mf, ok := step.(ManagedFileStep); ok {
+				path := fmt.Sprintf("packages.%s.%s[%d]", name, kind, idx)
+				if mf.From != "" && !BundlePath(mf.From) {
+					findings = append(findings, Finding{Path: path, Msg: fmt.Sprintf("from %q must be a path inside the bundle's files/", mf.From)})
+				}
+				if mf.Mode != "" && mf.Mode != "0644" && mf.Mode != "0755" {
+					findings = append(findings, Finding{Path: path, Msg: `mode must be "0644" or "0755"`})
 				}
 			}
 			if sv, ok := step.(ServiceStep); ok && sv.StartInterval != nil {

@@ -185,6 +185,8 @@ func stepOnly(s manifest.Step) *manifest.Only {
 		return v.Only
 	case manifest.SymlinkStep:
 		return v.Only
+	case manifest.ManagedFileStep:
+		return v.Only
 	case manifest.JSONMergeStep:
 		return v.Only
 	case manifest.LineInFileStep:

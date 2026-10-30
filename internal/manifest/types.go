@@ -99,7 +99,10 @@ type DownloadStep struct {
 	Product string `toml:"product"` // what /links is asked for on a gated site; "" → Tool
 	Version string `toml:"version"` // "latest" (default when empty) or pinned "1.4.0"
 	Bin     string `toml:"bin"`     // binary inside tarball + installed name
-	Only    *Only  `toml:"only"`
+	// Setup (spec 2) opts in to the release's setup bundle: its
+	// [packages.integration] fragment joins the plan at this version.
+	Setup bool  `toml:"setup"`
+	Only  *Only `toml:"only"`
 }
 
 // ProductName is what the access service is asked for: Product, else Tool.
@@ -125,6 +128,25 @@ type ServiceStep struct {
 	StartInterval    *int              `toml:"start-interval"` // StartInterval seconds: a periodic job (requires keep-alive = false)
 	SessionType      string            `toml:"session-type"`   // LimitLoadToSessionType, e.g. "Aqua"
 	Only             *Only             `toml:"only"`
+}
+
+// ManagedFileStep (spec 2) writes one release-owned file: From is a regular
+// file relative to the verified setup bundle's files/, To the destination
+// (~ and relative paths expand as for other steps), Mode "0644" or "0755".
+type ManagedFileStep struct {
+	From string `toml:"from"`
+	To   string `toml:"to"`
+	Mode string `toml:"mode"`
+	Only *Only  `toml:"only"`
+	// Source is From's bytes in the verified setup bundle, set by BindSetup
+	// and never by a manifest; nil means no verified bundle supplied it.
+	Source *SetupSource `toml:"-" json:"-"`
+}
+
+// SetupSource is a managed file's content and the release that supplied it.
+type SetupSource struct {
+	Tool, Version string
+	Data          []byte
 }
 
 type SymlinkStep struct {
@@ -190,6 +212,9 @@ func (ServiceStep) Class() Class { return ClassSoftware }
 
 func (SymlinkStep) Kind() string { return "symlink" }
 func (SymlinkStep) Class() Class { return ClassFiles }
+
+func (ManagedFileStep) Kind() string { return "managed-file" }
+func (ManagedFileStep) Class() Class { return ClassFiles }
 
 func (JSONMergeStep) Kind() string { return "json-merge" }
 func (JSONMergeStep) Class() Class { return ClassFiles }

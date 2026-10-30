@@ -9,7 +9,11 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "spec": { "type": "integer", "const": 1 },
+        "spec": {
+          "type": "integer",
+          "enum": [1, 2],
+          "description": "Manifest schema version. 2 adds release setup: download setup = true and managed-file steps."
+        },
         "layer": {
           "type": "string",
           "enum": ["user", "project"],
@@ -92,6 +96,10 @@
           "type": "array",
           "items": { "$ref": "#/$defs/symlinkStep" }
         },
+        "managed-file": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/managedFileStep" }
+        },
         "json-merge": {
           "type": "array",
           "items": { "$ref": "#/$defs/jsonMergeStep" }
@@ -149,6 +157,22 @@
         "product": { "type": "string" },
         "version": { "type": "string" },
         "bin": { "type": "string" },
+        "setup": {
+          "type": "boolean",
+          "description": "Spec 2: plan the release's setup bundle (its [packages.integration]) at the same version."
+        },
+        "only": { "$ref": "#/$defs/only" }
+      }
+    },
+    "managedFileStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Spec 2: one release-owned file from the verified setup bundle.",
+      "required": ["from", "to", "mode"],
+      "properties": {
+        "from": { "type": "string", "description": "A regular file relative to the setup bundle's files/." },
+        "to": { "type": "string" },
+        "mode": { "type": "string", "enum": ["0644", "0755"] },
         "only": { "$ref": "#/$defs/only" }
       }
     },

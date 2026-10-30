@@ -57,6 +57,7 @@ func packageProperties(t *testing.T) map[string]any {
 var parserKinds = []string{
 	"install", "github-release", "git-clone", "service", "symlink",
 	"json-merge", "line-in-file", "verify", "toml-merge", "download",
+	"managed-file",
 }
 
 // nonKindPackageKeys are the package.properties entries that are NOT step
@@ -73,7 +74,7 @@ func TestPackageStepKindsPresent(t *testing.T) {
 }
 
 // TestPackagePropertiesExactSet asserts the schema's package.properties keys are
-// EXACTLY the 4 structural fields plus the 10 parser kinds — no more, no fewer.
+// EXACTLY the 4 structural fields plus the 11 parser kinds — no more, no fewer.
 // This guards both directions of drift between parser and schema.
 func TestPackagePropertiesExactSet(t *testing.T) {
 	props := packageProperties(t)
@@ -86,8 +87,8 @@ func TestPackagePropertiesExactSet(t *testing.T) {
 		want[k] = true
 	}
 
-	if len(parserKinds) != 10 {
-		t.Fatalf("parserKinds has %d entries, want exactly 10", len(parserKinds))
+	if len(parserKinds) != 11 {
+		t.Fatalf("parserKinds has %d entries, want exactly 11", len(parserKinds))
 	}
 
 	// Every schema key must be expected.
@@ -133,5 +134,37 @@ func TestDownloadStepHasProduct(t *testing.T) {
 	props := m["$defs"].(map[string]any)["downloadStep"].(map[string]any)["properties"].(map[string]any)
 	if _, ok := props["product"]; !ok {
 		t.Fatal("downloadStep schema has no product property")
+	}
+}
+
+// TestSpec2SetupSyntax: spec 2's setup opt-in and managed-file step are in the
+// schema with the fields the parser reads, and spec accepts 1 and 2 only.
+func TestSpec2SetupSyntax(t *testing.T) {
+	var m map[string]any
+	if err := json.Unmarshal(JSON(), &m); err != nil {
+		t.Fatal(err)
+	}
+	spec := m["properties"].(map[string]any)["kempt"].(map[string]any)["properties"].(map[string]any)["spec"].(map[string]any)
+	enum, _ := spec["enum"].([]any)
+	if len(enum) != 2 || enum[0] != float64(1) || enum[1] != float64(2) {
+		t.Errorf("spec enum = %v; want [1 2]", enum)
+	}
+	defs := m["$defs"].(map[string]any)
+	if _, ok := defs["downloadStep"].(map[string]any)["properties"].(map[string]any)["setup"]; !ok {
+		t.Error("downloadStep schema has no setup property")
+	}
+	mf, ok := defs["managedFileStep"].(map[string]any)
+	if !ok {
+		t.Fatal("schema has no managedFileStep")
+	}
+	props := mf["properties"].(map[string]any)
+	for _, k := range []string{"from", "to", "mode", "only"} {
+		if _, ok := props[k]; !ok {
+			t.Errorf("managedFileStep missing %q", k)
+		}
+	}
+	mode, _ := props["mode"].(map[string]any)["enum"].([]any)
+	if len(mode) != 2 || mode[0] != "0644" || mode[1] != "0755" {
+		t.Errorf("mode enum = %v", mode)
 	}
 }
