@@ -6,6 +6,7 @@
 - Prepare checksummed binary/setup pairs before review in init/apply/update/upgrade; offline setup inspection uses cached declarations and reports unresolved inputs. Applied assets are frozen to the reviewed release; rolling major holds remain explicit.
 - Record managed-file ownership, preserve foreign content and local edits, and converge wrappers and multi-file skills. Doctor attributes missing/drifted managed files through the existing rollup.
 - Failed parents block dependent work, files-only refresh holds dependent setup while software changes wait, and folded setup merges run after their release parents while retaining layer precedence. Download and TOML-merge `only` clauses are now honored by the shared engine, including existing manifests.
+- Preserve declared config/service order when scheduling folded setup merges. Record incomplete launchd activation so ordinary apply retries a failed bootstrap without restarting successfully configured services. Refresh legacy verification after successful rolling updates.
 - Document the bundle format and extra-assets publisher contract. Tool declaration migrations and hook/plugin-specific health checks are not part of this engine release.
 
 ## 0.11.0
