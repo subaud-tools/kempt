@@ -269,7 +269,7 @@ func missingFields(s Step) []string {
 		req(len(v.Program) > 0, "program")
 	case JSONMergeStep:
 		req(v.File != "", "file")
-		req(len(v.Merge) > 0 || len(v.Remove) > 0, "merge")
+		req(len(v.Merge) > 0 || len(v.Remove) > 0 || len(v.RemoveHooks) > 0, "merge")
 	case TomlMergeStep:
 		req(v.File != "", "file")
 		req(len(v.Merge) > 0, "merge")
@@ -391,6 +391,11 @@ func validateStepFields(m *Manifest) []Finding {
 				})
 			}
 			if js, ok := step.(JSONMergeStep); ok {
+				for _, r := range js.RemoveHooks {
+					if r.Event == "" || len(r.Commands) == 0 || slices.Contains(r.Commands, "") {
+						findings = append(findings, Finding{Path: fmt.Sprintf("packages.%s.%s[%d]", name, kind, idx), Msg: "remove-hooks requires a nonempty event and commands"})
+					}
+				}
 				for _, r := range js.Remove {
 					if slices.Contains(strings.Split(r, "."), "") {
 						findings = append(findings, Finding{
@@ -402,6 +407,9 @@ func validateStepFields(m *Manifest) []Finding {
 			}
 			if mf, ok := step.(ManagedFileStep); ok {
 				path := fmt.Sprintf("packages.%s.%s[%d]", name, kind, idx)
+				if len(mf.AdoptMarkers) > 0 && (!strings.HasSuffix(mf.To, "/SKILL.md") && mf.To != "SKILL.md") {
+					findings = append(findings, Finding{Path: path, Msg: "adopt-markers requires a managed SKILL.md"})
+				}
 				if mf.From != "" && !BundlePath(mf.From) {
 					findings = append(findings, Finding{Path: path, Msg: fmt.Sprintf("from %q must be a path inside the bundle's files/", mf.From)})
 				}

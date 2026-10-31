@@ -376,3 +376,112 @@ func TestFoldKeepsRemovePaths(t *testing.T) {
 		})
 	}
 }
+
+// Later release fragments retire the base spelling without resurrecting it
+// during folding or changing the original parsed declarations on a second plan.
+func TestFoldDeclaredHookRemoval(t *testing.T) {
+	ctx := buildCtx(t)
+	var pkgs []*manifest.Package
+	for i, src := range []string{
+		`[[packages.muster.json-merge]]
+file="~/settings.json"
+merge={hooks={Stop=[{hooks=[{type="command",command="muster hook Stop claude"}]}]}}`,
+		`[[packages.muster.json-merge]]
+file="~/settings.json"
+remove-hooks=[{event="Stop",matcher="",commands=["muster hook Stop claude","~/.local/bin/muster hook Stop claude"]}]
+merge={hooks={Stop=[{hooks=[{type="command",command="~/.local/bin/muster hook Stop claude"}]}]}}`,
+	} {
+		m, f := manifest.Parse([]byte("[kempt]\nspec=2\n" + src))
+		if len(f) > 0 {
+			t.Fatal(f)
+		}
+		p := m.Packages["muster"]
+		if i == 1 {
+			p.Layer = "setup"
+			p.Name = "muster/setup/integration"
+		}
+		pkgs = append(pkgs, p)
+	}
+	for i := 0; i < 2; i++ {
+		plan, err := engine.BuildPlan(ctx, pkgs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 1 {
+			for _, p := range plan.Packages {
+				for _, s := range p.Steps {
+					if s.Delta.Op != engine.OpNoop {
+						t.Fatalf("repeat: %+v", s)
+					}
+				}
+			}
+		}
+		var out bytes.Buffer
+		if n := engine.Execute(ctx, plan, &out); n != 0 {
+			t.Fatal(out.String())
+		}
+		b, err := os.ReadFile(filepath.Join(ctx.Home, "settings.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(b), `"command": "muster hook Stop claude"`) || strings.Count(string(b), `"command":`) != 1 {
+			t.Fatalf("resurrected aliases: %s", b)
+		}
+	}
+}
+
+func TestFoldHookRemovalDoesNotReplaceUnrelatedHooks(t *testing.T) {
+	ctx := buildCtx(t)
+	file := filepath.Join(ctx.Home, "settings.json")
+	if err := os.WriteFile(file, []byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"unrelated"},{"type":"command","command":"muster hook Stop claude"}]}]}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var pkgs []*manifest.Package
+	for i, src := range []string{
+		`[[packages.muster.json-merge]]
+file="~/settings.json"
+arrays="replace"
+merge={packages=["npm:one"]}`,
+		`[[packages.muster.json-merge]]
+file="~/settings.json"
+remove-hooks=[{event="Stop",matcher="",commands=["muster hook Stop claude","~/.local/bin/muster hook Stop claude"]}]
+merge={hooks={Stop=[{hooks=[{type="command",command="~/.local/bin/muster hook Stop claude"}]}]}}`,
+	} {
+		m, f := manifest.Parse([]byte("[kempt]\nspec=2\n" + src))
+		if len(f) > 0 {
+			t.Fatal(f)
+		}
+		p := m.Packages["muster"]
+		if i == 1 {
+			p.Layer = "setup"
+			p.Name = "muster/setup/integration"
+		}
+		pkgs = append(pkgs, p)
+	}
+	for i := 0; i < 2; i++ {
+		plan, err := engine.BuildPlan(ctx, pkgs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if i == 1 {
+			for _, p := range plan.Packages {
+				for _, s := range p.Steps {
+					if s.Delta.Op != engine.OpNoop {
+						t.Fatalf("repeat: %+v", s)
+					}
+				}
+			}
+		}
+		var out bytes.Buffer
+		if engine.Execute(ctx, plan, &out) != 0 {
+			t.Fatal(out.String())
+		}
+		b, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(b), `"unrelated"`) || strings.Contains(string(b), `"command": "muster hook Stop claude"`) {
+			t.Fatalf("lost sibling or retained alias: %s", b)
+		}
+	}
+}

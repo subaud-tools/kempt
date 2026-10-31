@@ -45,13 +45,16 @@ func (jsonMergeHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.D
 
 	desired := desiredDoc(ctx, st)
 	replace := st.Arrays == "replace"
-	pruned := jsonutil.RemovePaths(current, st.Remove)
+	pruned := jsonutil.RemoveHooks(jsonutil.RemovePaths(current, st.Remove), st.RemoveHooks, ctx.Home)
 	next := merge(desired, pruned, replace)
-	if len(st.Remove) == 0 && isSubset(desired, current, replace) || len(st.Remove) > 0 && reflect.DeepEqual(next, current) {
+	if reflect.DeepEqual(next, current) {
 		return engine.Delta{Op: engine.OpNoop, Detail: base}, nil
 	}
 
 	var parts []string
+	if len(st.RemoveHooks) > 0 {
+		parts = append(parts, "reconcile declared hooks")
+	}
 	var gone []string
 	for _, r := range st.Remove {
 		path := strings.Split(r, ".")
@@ -98,7 +101,7 @@ func (jsonMergeHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 		return fmt.Errorf("existing file is not valid JSON: %s", file)
 	}
 
-	merged := merge(desiredDoc(ctx, st), jsonutil.RemovePaths(current, st.Remove), st.Arrays == "replace")
+	merged := merge(desiredDoc(ctx, st), jsonutil.RemoveHooks(jsonutil.RemovePaths(current, st.Remove), st.RemoveHooks, ctx.Home), st.Arrays == "replace")
 	out, err := json.MarshalIndent(merged, "", "  ")
 	if err != nil {
 		return err

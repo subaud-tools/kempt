@@ -169,7 +169,12 @@
       "additionalProperties": false,
       "description": "Spec 2: one release-owned file from the verified setup bundle.",
       "required": ["from", "to", "mode"],
+      "allOf": [{
+        "if": {"required": ["adopt-markers"], "properties": {"adopt-markers": {"minProperties": 1}}},
+        "then": {"properties": {"to": {"pattern": "(^|/)SKILL[.]md$"}}}
+      }],
       "properties": {
+        "adopt-markers": {"type": "object", "additionalProperties": {"type": "string"}},
         "from": { "type": "string", "description": "A regular file relative to the setup bundle's files/." },
         "to": { "type": "string" },
         "mode": { "type": "string", "enum": ["0644", "0755"] },
@@ -227,6 +232,18 @@
           "additionalProperties": true
         },
         "remove": { "type": "array", "items": { "type": "string" } },
+        "remove-hooks": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["event", "commands"],
+            "properties": {
+              "event": {"type": "string", "minLength": 1},
+              "matcher": {"type": "string"},
+              "commands": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+            }
+          }
+        },
         "arrays": { "enum": ["append", "replace"] },
         "only": { "$ref": "#/$defs/only" }
       }

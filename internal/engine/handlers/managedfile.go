@@ -128,6 +128,9 @@ func planManagedFile(ctx *machine.Context, st manifest.ManagedFileStep) (managed
 	if recorded && rec.Tool != st.Source.Tool {
 		return say(engine.OpBlocked, fmt.Sprintf("kempt wrote it for %s: not %s's to replace", rec.Tool, st.Source.Tool))
 	}
+	if !recorded && len(st.AdoptMarkers) > 0 && !toolSkill(dest, cur, a.data, st.AdoptMarkers) {
+		return say(engine.OpBlocked, "content does not satisfy declared skill adoption markers: not overwriting")
+	}
 	owned := recorded && rec.Digest == digest(cur)
 	sameMode := fi.Mode().Perm() == a.mode
 	switch {
@@ -144,7 +147,7 @@ func planManagedFile(ctx *machine.Context, st manifest.ManagedFileStep) (managed
 		return say(engine.OpChange, "update content, mode "+st.Mode)
 	case recorded:
 		return say(engine.OpBlocked, "changed since kempt wrote it: not overwriting")
-	case toolSkill(dest, cur, a.data):
+	case toolSkill(dest, cur, a.data, st.AdoptMarkers):
 		a.write = true
 		return say(engine.OpChange, fmt.Sprintf("adopt %s's installed skill, update content, mode %s", filepath.Base(filepath.Dir(dest)), st.Mode))
 	}
@@ -152,9 +155,9 @@ func planManagedFile(ctx *machine.Context, st manifest.ManagedFileStep) (managed
 }
 
 // toolSkill uses the shared installer's ownership rule for both versions.
-func toolSkill(dest string, cur, want []byte) bool {
+func toolSkill(dest string, cur, want []byte, markers map[string]string) bool {
 	name := filepath.Base(filepath.Dir(dest))
-	return filepath.Base(dest) == "SKILL.md" && skills.Owns(name, cur) && skills.Owns(name, want)
+	return filepath.Base(dest) == "SKILL.md" && skills.OwnsWithMarkers(name, cur, markers) && skills.OwnsWithMarkers(name, want, markers)
 }
 
 // digest is the hex sha256 of b.

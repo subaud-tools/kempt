@@ -33,6 +33,10 @@ func validateSpec2Syntax(m *Manifest) []Finding {
 				if s.Setup {
 					findings = append(findings, Finding{Path: path, Msg: "setup requires spec 2"})
 				}
+			case JSONMergeStep:
+				if len(s.RemoveHooks) > 0 {
+					findings = append(findings, Finding{Path: path, Msg: "remove-hooks requires spec 2"})
+				}
 			case ManagedFileStep:
 				findings = append(findings, Finding{Path: path, Msg: "managed-file requires spec 2"})
 			}
