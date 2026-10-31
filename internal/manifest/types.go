@@ -2,6 +2,8 @@ package manifest
 
 import (
 	"cmp"
+	"github.com/subaud-tools/tools-common/hookconfig"
+
 	"github.com/subaud-tools/kempt/internal/state"
 )
 
@@ -145,10 +147,11 @@ type ServiceStep struct {
 // file relative to the verified setup bundle's files/, To the destination
 // (~ and relative paths expand as for other steps), Mode "0644" or "0755".
 type ManagedFileStep struct {
-	From string `toml:"from"`
-	To   string `toml:"to"`
-	Mode string `toml:"mode"`
-	Only *Only  `toml:"only"`
+	AdoptMarkers map[string]string `toml:"adopt-markers"`
+	From         string            `toml:"from"`
+	To           string            `toml:"to"`
+	Mode         string            `toml:"mode"`
+	Only         *Only             `toml:"only"`
 	// Source is From's bytes in the verified setup bundle, set by BindSetup
 	// and never by a manifest; nil means no verified bundle supplied it.
 	Source *SetupSource `toml:"-" json:"-"`
@@ -168,11 +171,12 @@ type SymlinkStep struct {
 }
 
 type JSONMergeStep struct {
-	File   string         `toml:"file"`
-	Merge  map[string]any `toml:"merge"`
-	Remove []string       `toml:"remove"` // dotted key paths deleted before the merge
-	Arrays string         `toml:"arrays"` // ""|"append"|"replace"; empty == "append"
-	Only   *Only          `toml:"only"`
+	RemoveHooks []hookconfig.Removal `toml:"remove-hooks"`
+	File        string               `toml:"file"`
+	Merge       map[string]any       `toml:"merge"`
+	Remove      []string             `toml:"remove"` // dotted key paths deleted before the merge
+	Arrays      string               `toml:"arrays"` // ""|"append"|"replace"; empty == "append"
+	Only        *Only                `toml:"only"`
 }
 
 type TomlMergeStep struct {

@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/subaud-tools/tools-common/hookconfig"
+
 	"github.com/subaud-tools/kempt/internal/jsonutil"
 	"github.com/subaud-tools/kempt/internal/machine"
 	"github.com/subaud-tools/kempt/internal/manifest"
@@ -268,6 +270,7 @@ func (c *composed) foldMerges(ctx *machine.Context) map[mergeRef]int {
 	}
 
 	fileRemoves := c.pruneRemoved(groups, order, fileLayers)
+	fileHooks := c.pruneHooks(ctx, groups, order, fileLayers)
 
 	remove := map[mergeRef]bool{}
 	replaceAt := map[string]mergeRef{} // file -> the replace fold's position
@@ -330,6 +333,9 @@ func (c *composed) foldMerges(ctx *machine.Context) map[mergeRef]int {
 	}
 	for file, paths := range fileRemoves {
 		placeRemoves(pkgs, file, paths, appendAt, replaceAt)
+	}
+	for file, rules := range fileHooks {
+		placeHookRemoves(pkgs, file, rules, appendAt, replaceAt)
 	}
 	for at, contributors := range contributorsAt {
 		if len(contributors) < 2 {
@@ -759,4 +765,62 @@ func (c *composed) gateSetupMerges(ctx *machine.Context, gates map[string]setupM
 		p.Steps = steps
 	}
 	c.notes = notes
+}
+
+// pruneHooks applies later ownership removals to earlier contributions, just
+// as pruneRemoved does for paths, without mutating the parsed declarations.
+func (c *composed) pruneHooks(ctx *machine.Context, groups map[string]*mergeGroup, order []string, layers map[string]map[string]bool) map[string][]hookconfig.Removal {
+	byFile := map[string][]mergeRef{}
+	for _, key := range order {
+		g := groups[key]
+		if g.kind == "json-merge" && len(layers[g.file]) >= 2 {
+			byFile[g.file] = append(byFile[g.file], g.refs...)
+		}
+	}
+	out := map[string][]hookconfig.Removal{}
+	for file, refs := range byFile {
+		sort.Slice(refs, func(i, j int) bool { return less(refs[i], refs[j]) })
+		for j, r := range refs {
+			rules := c.pkgs[r.pkg].Steps[r.step].(manifest.JSONMergeStep).RemoveHooks
+			if len(rules) == 0 {
+				continue
+			}
+			out[file] = append(out[file], rules...)
+			for _, prior := range refs[:j] {
+				st := c.pkgs[prior.pkg].Steps[prior.step].(manifest.JSONMergeStep)
+				doc := jsonutil.ExpandHome(jsonutil.ToAny(st.Merge), ctx.Home)
+				st.Merge, _ = jsonutil.RemoveHooks(doc, rules, ctx.Home).(map[string]any)
+				c.pkgs[prior.pkg].Steps[prior.step] = st
+			}
+		}
+	}
+	return out
+}
+
+// A hook removal and every desired hook contribution must live in one fold,
+// otherwise the later fold can remove the earlier fold's canonical command.
+func placeHookRemoves(pkgs []*manifest.Package, file string, rules []hookconfig.Removal, appendAt, replaceAt map[string]mergeRef) {
+	target, hasReplace := replaceAt[file]
+	if a, ok := appendAt[file]; ok {
+		if !hasReplace {
+			target = a
+		} else if _, ownsHooks := pkgs[target.pkg].Steps[target.step].(manifest.JSONMergeStep).Merge["hooks"]; !ownsHooks {
+			target = a
+		}
+	}
+	st := pkgs[target.pkg].Steps[target.step].(manifest.JSONMergeStep)
+	if a, ok := appendAt[file]; ok && a != target {
+		as := pkgs[a.pkg].Steps[a.step].(manifest.JSONMergeStep)
+		if hooks, ok := as.Merge["hooks"]; ok {
+			st.Merge = deepCopy(st.Merge)
+			st.Merge["hooks"] = combine(hooks, st.Merge["hooks"], "", "", map[string]string{}, new([]string))
+			if st.Merge["hooks"] == nil {
+				st.Merge["hooks"] = hooks
+			}
+			as.Merge, _ = jsonutil.RemovePaths(as.Merge, []string{"hooks"}).(map[string]any)
+			pkgs[a.pkg].Steps[a.step] = as
+		}
+	}
+	st.RemoveHooks = rules
+	pkgs[target.pkg].Steps[target.step] = st
 }

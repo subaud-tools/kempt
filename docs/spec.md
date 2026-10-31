@@ -232,6 +232,36 @@ kempt does not silently overwrite edits. Doctor attributes missing/drifted
 managed-file findings to the namespaced owning package through its normal rollup,
 with `kempt apply` for convergible changes and plan inspection for blockers.
 
+**Hook and skill reconciliation (kempt 0.13.0, pending release).** Spec 2
+adds exact owned-hook removal before the canonical merge:
+
+```toml
+[[packages.integration.json-merge]]
+file = "~/.claude/settings.json"
+remove-hooks = [{ event = "Stop", matcher = "", commands = ["muster hook Stop claude", "~/.local/bin/muster hook Stop claude"] }]
+merge = { hooks = { Stop = [{ hooks = [{ type = "command", command = "~/.local/bin/muster hook Stop claude" }] }] } }
+```
+
+Rules match command hooks by exact event, matcher and command; absent matcher
+matches the empty string only. Unrelated siblings, group metadata and different
+matchers remain. Only groups emptied by removal are pruned. `${HOME}` expands
+in declarations, never in the existing file; bare `~` stays literal. Later
+layers remove earlier aliases before their canonical merge. Planning compares
+the final result, so remove-and-readd does not cause perpetual drift.
+
+A managed `SKILL.md` can declare `adopt-markers = { muda-owned = "muda" }`.
+Before adopting an untracked skill, both its existing and desired contents
+must meet the shared name rule and every exact string marker. Muda's value is
+the skill's name, not `true`. Without markers the existing name-only rule
+remains. Recorded provenance and local-edit protection are unchanged.
+
+Doctor uses these declarations to attribute duplicate owned hook registrations
+and still-configured retired paths (including plugin registrations), with
+`kempt apply` remediation. Different hooks on one event are not duplicates;
+configuration counts do not prove runtime delivery or that a plugin is active.
+Kempt 0.12.0 rejects both new fields. Producers must wait for the supporting
+engine release before publishing declarations that require them.
+
 **Producing bundles.** Generate from the same canonical sources used by the
 tool's own setup/embedded skills, using tools-common `setupbundle.Build(tool,
 version, manifestBytes, filesFS)` (available since v0.36.0). Write its bytes as

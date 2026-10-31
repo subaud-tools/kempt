@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Spec 2 `remove-hooks` reconciles exact declared hook aliases before canonical JSON merges, preserving unrelated hooks and matcher distinctions. Folded layers and repeated plans converge without mutating declarations.
+- Managed `SKILL.md` declarations can require exact `adopt-markers` on both current and desired legacy assets, using tools-common v0.40.0. Existing tracked ownership and ordinary name-only adoption remain unchanged.
+- Doctor attributes duplicate owned hook registrations and still-present declared retired configuration to packages, with ordinary apply remediation; it makes no runtime-delivery claims.
+
 ## 0.12.0
 
 - Spec 2 adds per-download `setup = true` and release-owned `managed-file` declarations. Spec 1 remains supported; unsupported schema versions are rejected. Uses tools-common v0.37.0.

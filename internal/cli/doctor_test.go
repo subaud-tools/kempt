@@ -96,3 +96,43 @@ func TestDoctorExitCode(t *testing.T) {
 		}
 	})
 }
+
+func TestDoctorDeclaredHookReconciliation(t *testing.T) {
+	hermeticState(t)
+	home := t.TempDir()
+	withContextHome(t, home, &run.FakeRunner{})
+	live := filepath.Join(home, "settings.json")
+	if err := os.WriteFile(live, []byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"muster hook Stop claude"},{"type":"command","command":"~/.local/bin/muster hook Stop claude"},{"type":"command","command":"unrelated"}]}]}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(home, "kempt.toml")
+	if err := os.WriteFile(path, []byte(`[kempt]
+spec=2
+[[packages.muster.json-merge]]
+file="~/settings.json"
+remove-hooks=[{event="Stop",matcher="",commands=["muster hook Stop claude","~/.local/bin/muster hook Stop claude"]}]
+merge={hooks={Stop=[{hooks=[{type="command",command="~/.local/bin/muster hook Stop claude"}]}]}}
+`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	var out, errw bytes.Buffer
+	if code := Dispatch([]string{"doctor", "-manifest", path}, &out, &errw); code != 0 {
+		t.Fatalf("doctor %d: %s %s", code, &out, &errw)
+	}
+	if !strings.Contains(out.String(), "duplicate owned hook registrations") {
+		t.Fatal(out.String())
+	}
+	out.Reset()
+	errw.Reset()
+	if code := Dispatch([]string{"apply", "-manifest", path, "-yes"}, &out, &errw); code != 0 {
+		t.Fatalf("apply %d: %s %s", code, &out, &errw)
+	}
+	out.Reset()
+	errw.Reset()
+	if code := Dispatch([]string{"doctor", "-manifest", path}, &out, &errw); code != 0 {
+		t.Fatalf("doctor %d: %s %s", code, &out, &errw)
+	}
+	if strings.Contains(out.String(), "duplicate owned") || strings.Contains(out.String(), "pending change") {
+		t.Fatal(out.String())
+	}
+}

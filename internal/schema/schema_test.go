@@ -168,3 +168,16 @@ func TestSpec2SetupSyntax(t *testing.T) {
 		t.Errorf("mode enum = %v", mode)
 	}
 }
+
+func TestReconciliationFields(t *testing.T) {
+	var m map[string]any
+	if err := json.Unmarshal(JSON(), &m); err != nil {
+		t.Fatal(err)
+	}
+	defs := m["$defs"].(map[string]any)
+	for def, field := range map[string]string{"jsonMergeStep": "remove-hooks", "managedFileStep": "adopt-markers"} {
+		if _, ok := defs[def].(map[string]any)["properties"].(map[string]any)[field]; !ok {
+			t.Errorf("%s missing %s", def, field)
+		}
+	}
+}
