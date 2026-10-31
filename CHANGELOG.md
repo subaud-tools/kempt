@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.13.0
 
 - Spec 2 `remove-hooks` reconciles exact declared hook aliases before canonical JSON merges, preserving unrelated hooks and matcher distinctions. Folded layers and repeated plans converge without mutating declarations.
 - Managed `SKILL.md` declarations can require exact `adopt-markers` on both current and desired legacy assets, using tools-common v0.40.0. Existing tracked ownership and ordinary name-only adoption remain unchanged.

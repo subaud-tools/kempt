@@ -2,6 +2,7 @@ package manifest
 
 import (
 	"cmp"
+
 	"github.com/subaud-tools/tools-common/hookconfig"
 
 	"github.com/subaud-tools/kempt/internal/state"
