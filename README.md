@@ -152,6 +152,11 @@ selection. `plan` also accepts `-os` and `-arch` to dry-plan for another
 platform (e.g. `kempt plan -manifest kempt.toml -os linux -arch arm64`) without
 inspecting the local machine's real OS/arch.
 
+On Linux an install step's `apt` list is used instead of its `brew` one: kempt
+installs the missing packages with `sudo -n apt-get`, so the user needs
+passwordless sudo; without it, or without `apt-get`, the step is blocked and the
+plan says why.
+
 ## Coming next
 
 Dotfiles-as-reference-config and the [kempt.tools](https://kempt.tools) site

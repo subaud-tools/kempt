@@ -19,10 +19,11 @@ func init() { engine.RegisterHandler(installHandler{}) }
 // Backends fall into two categories:
 //
 //   - OS-EXCLUSIVE software backend (brew/winget/apt): exactly one applies per
-//     OS, first-match wins. darwin/linux with brew content → brew; matching-OS
-//     winget (windows) or apt (linux) with no brew → OpBlocked "(backend <name>
-//     not implemented in this phase)"; nothing matched → no OS backend. On
-//     linux with BOTH brew and apt content, brew is selected and apt ignored.
+//     OS, first-match wins. linux with apt content → apt; darwin, or linux
+//     with no apt content, with brew content → brew; windows with winget
+//     content → OpBlocked "(backend winget not implemented in this phase)";
+//     nothing matched → no OS backend. On linux with BOTH brew and apt
+//     content, apt is selected and brew ignored (a Linux host has no Homebrew).
 //   - ADDITIVE cross-platform sources (npm/pi): each applies independently on
 //     any OS whenever its list is non-empty. A single install step may carry
 //     brew AND npm AND pi, and every present source is evaluated and applied.
@@ -53,7 +54,13 @@ func (installHandler) Inspect(ctx *machine.Context, s manifest.Step) (engine.Del
 	var subs []engine.Delta
 
 	// OS-exclusive software backend (one wins per OS).
-	if useBrew(ctx, st) {
+	if useApt(ctx, st) {
+		d, err := aptInspect(ctx, st.Apt)
+		if err != nil {
+			return engine.Delta{}, err
+		}
+		subs = append(subs, d)
+	} else if useBrew(ctx, st) {
 		d, err := brewInspect(ctx, st.Brew)
 		if err != nil {
 			return engine.Delta{}, err
@@ -117,7 +124,11 @@ func (installHandler) Apply(ctx *machine.Context, s manifest.Step) error {
 	st := s.(manifest.InstallStep)
 	// Run every actionable backend in evaluation order. Each applier recomputes
 	// its own missing set and no-ops when nothing is due.
-	if useBrew(ctx, st) {
+	if useApt(ctx, st) {
+		if err := aptApply(ctx, st.Apt); err != nil {
+			return err
+		}
+	} else if useBrew(ctx, st) {
 		if err := brewApply(ctx, st.Brew); err != nil {
 			return err
 		}
@@ -245,9 +256,12 @@ func splitNameVersion(entry string) (name, version string) {
 }
 
 // useBrew reports whether the brew backend applies: darwin/linux with brew
-// content.
+// content, unless apt applies.
 func useBrew(ctx *machine.Context, st manifest.InstallStep) bool {
 	if ctx.OS != "darwin" && ctx.OS != "linux" {
+		return false
+	}
+	if useApt(ctx, st) {
 		return false
 	}
 	return st.Brew != nil && hasBrewContent(st.Brew)
@@ -257,18 +271,11 @@ func hasBrewContent(b *manifest.BrewSpec) bool {
 	return len(b.Formulas) > 0 || len(b.Casks) > 0 || len(b.Taps) > 0
 }
 
-// unimplementedBackend names a matching-OS non-brew backend that has content
-// but is not implemented in this phase.
+// unimplementedBackend names a matching-OS backend that has content but is
+// not implemented in this phase.
 func unimplementedBackend(ctx *machine.Context, st manifest.InstallStep) (string, bool) {
-	switch ctx.OS {
-	case "windows":
-		if len(st.Winget) > 0 {
-			return "winget", true
-		}
-	case "linux":
-		if len(st.Apt) > 0 {
-			return "apt", true
-		}
+	if ctx.OS == "windows" && len(st.Winget) > 0 {
+		return "winget", true
 	}
 	return "", false
 }
