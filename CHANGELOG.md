@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.14.0
+
+- The `apt` install backend: on Linux an install step's `apt` list wins over `brew` (a Linux host has no Homebrew). kempt reads what is installed with `dpkg-query` once per run and plans the missing packages; apply runs `sudo -n apt-get update` once per run and `sudo -n apt-get install -y --no-install-recommends` with them. With no `apt-get`, or `sudo -n` refused, the step is blocked naming why. On macOS `brew` is still used when a step has both.
+
 ## 0.13.0
 
 - Spec 2 `remove-hooks` reconciles exact declared hook aliases before canonical JSON merges, preserving unrelated hooks and matcher distinctions. Folded layers and repeated plans converge without mutating declarations.

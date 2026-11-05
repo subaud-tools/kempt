@@ -241,24 +241,6 @@ func TestInstallBrewNotFound(t *testing.T) {
 	}
 }
 
-func TestInstallAptNotImplemented(t *testing.T) {
-	fake := &run.FakeRunner{Responses: map[string]run.Response{}}
-	ctx := installCtx(t, "linux", fake)
-	h := getInstallHandler(t)
-	step := manifest.InstallStep{Apt: []string{"jq"}}
-
-	d, err := h.Inspect(ctx, step)
-	if err != nil {
-		t.Fatalf("Inspect: %v", err)
-	}
-	if d.Op != engine.OpBlocked {
-		t.Fatalf("op = %v; want OpBlocked", d.Op)
-	}
-	if d.Detail != "install (backend apt not implemented in this phase)" {
-		t.Fatalf("detail = %q", d.Detail)
-	}
-}
-
 func TestInstallWingetOnDarwinSkips(t *testing.T) {
 	fake := &run.FakeRunner{Responses: map[string]run.Response{}}
 	ctx := installCtx(t, "darwin", fake)
@@ -274,24 +256,6 @@ func TestInstallWingetOnDarwinSkips(t *testing.T) {
 	}
 	if d.Detail != "install (no backend for darwin)" {
 		t.Fatalf("detail = %q", d.Detail)
-	}
-}
-
-func TestInstallLinuxBrewWins(t *testing.T) {
-	fake := &run.FakeRunner{Responses: brewFound("jq\n", "", "")}
-	ctx := installCtx(t, "linux", fake)
-	h := getInstallHandler(t)
-	step := manifest.InstallStep{
-		Brew: &manifest.BrewSpec{Formulas: []string{"jq"}},
-		Apt:  []string{"ripgrep"},
-	}
-
-	d, err := h.Inspect(ctx, step)
-	if err != nil {
-		t.Fatalf("Inspect: %v", err)
-	}
-	if d.Op != engine.OpNoop {
-		t.Fatalf("op = %v; want OpNoop (brew wins)", d.Op)
 	}
 }
 
