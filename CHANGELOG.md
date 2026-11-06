@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.15.1
+
+- kempt reads a command's output through a temporary file instead of a pipe. pi exits right after printing, and on macOS Node drops output still queued for a pipe, so `pi list` was sometimes cut short and kempt reported installed pi packages as missing (0.15.0's self-check then failed `kempt update` on a good machine). On this Mac, 3 of 25 `kempt plan` runs on 0.15.0 reported the false change; 0 of 25 with the fix.
+
 ## 0.15.0
 
 - **Behaviour change:** `apply`, `init`, `update` and `upgrade` now plan again after applying and exit non-zero, naming each step, when anything is left to change or blocked. Before, a run with blocked steps printed the count and exited 0.
