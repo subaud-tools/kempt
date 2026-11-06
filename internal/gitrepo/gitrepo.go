@@ -41,7 +41,7 @@ func Pull(r run.Runner, dir string) error {
 var ErrNotFastForward = errors.New("cannot fast-forward")
 
 // FastForward brings dir's branch up to its upstream (`git merge --ff-only
-// @{u}`, after a Fetch). It changes nothing and returns an error wrapping
+// --no-overwrite-ignore @{u}`, after a Fetch). It changes nothing and returns an error wrapping
 // ErrNotFastForward when the work tree has uncommitted changes or the branch
 // has diverged from its upstream.
 func FastForward(r run.Runner, dir string) error {
@@ -63,7 +63,9 @@ func FastForward(r run.Runner, dir string) error {
 	if ahead := strings.TrimSpace(out); ahead != "0" {
 		return fmt.Errorf("%w: it has diverged from its upstream (%s local, %d upstream commits)", ErrNotFastForward, ahead, behind)
 	}
-	_, err = r.Run("git", "-C", dir, "merge", "--ff-only", "--quiet", "@{u}")
+	// --no-overwrite-ignore: a file the remote starts tracking must not
+	// replace a local file this clone ignores (a secret, a local override).
+	_, err = r.Run("git", "-C", dir, "merge", "--ff-only", "--no-overwrite-ignore", "--quiet", "@{u}")
 	return err
 }
 
