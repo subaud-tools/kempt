@@ -61,8 +61,18 @@ func Prepare(ctx *machine.Context, selected []*manifest.Package, online bool) ([
 				p.Steps[i] = d
 				continue
 			}
-			d.Version, d.Resolved = r.Ref.Version, &r.Ref
+			ref := r.Ref
 			d.Held = r.Held
+			if !online && rolling(d) {
+				// The record may predate a release installed since; the cache
+				// is left for the next online resolve to rewrite.
+				installed, known := handlers.InstalledToolVersion(ctx, d.Bin)
+				var held string
+				if ref.Version, held = rollingVersion(d, r.Ref.Version, installed, known); held != "" {
+					d.Held = held
+				}
+			}
+			d.Version, d.Resolved = ref.Version, &ref
 			d.Asset, d.Checksums = r.Asset, r.AssetSums
 			p.Steps[i] = d
 			if !online {
@@ -80,28 +90,42 @@ func Prepare(ctx *machine.Context, selected []*manifest.Package, online bool) ([
 	return result, nil
 }
 
+// rolling reports whether d's version is decided by rollingVersion: neither a
+// manifest pin nor upgrade's exact candidate.
+func rolling(d manifest.DownloadStep) bool {
+	return d.CandidateVersion == "" && !handlers.IsPinnedVersion(d.Version)
+}
+
+// rollingVersion is the one version rule for a rolling setup download, online
+// (candidate is the latest release) and offline (candidate is the cached
+// record's): never below the installed version, and a major bump is held for
+// kempt upgrade, with held saying so.
+func rollingVersion(d manifest.DownloadStep, candidate, installed string, known bool) (version, held string) {
+	if !known {
+		return candidate, ""
+	}
+	if handlers.SemverMajorBump(candidate, installed) {
+		return installed, fmt.Sprintf("held %s %s -> %s (major release): run kempt upgrade %s", d.Bin, installed, candidate, d.Tool)
+	}
+	if !handlers.SemverNewer(candidate, installed) {
+		return installed, ""
+	}
+	return candidate, ""
+}
+
 func resolve(ctx *machine.Context, d manifest.DownloadStep) (*record, error) {
 	v := d.Version
 	if d.CandidateVersion != "" {
 		v = d.CandidateVersion
 	}
 	held := ""
-	if !handlers.IsPinnedVersion(v) {
-		var err error
-		v, err = handlers.LatestVersion(ctx, d.Site, d.ProductName(), d.Tool)
+	if rolling(d) {
+		latest, err := handlers.LatestVersion(ctx, d.Site, d.ProductName(), d.Tool)
 		if err != nil {
 			return nil, err
 		}
-		if installed, known := handlers.InstalledToolVersion(ctx, d.Bin); known {
-			// Rolling applies/updates hold major releases and never downgrade. An
-			// explicit upgrade supplies a separate exact candidate instead.
-			if handlers.SemverMajorBump(v, installed) {
-				held = fmt.Sprintf("held %s %s -> %s (major release): run kempt upgrade %s", d.Bin, installed, v, d.Tool)
-			}
-			if handlers.SemverMajorBump(v, installed) || !handlers.SemverNewer(v, installed) {
-				v = installed
-			}
-		}
+		installed, known := handlers.InstalledToolVersion(ctx, d.Bin)
+		v, held = rollingVersion(d, latest, installed, known)
 	}
 	if !versionPattern.MatchString(v) {
 		return nil, fmt.Errorf("invalid release version %q", v)
