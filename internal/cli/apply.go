@@ -255,22 +255,25 @@ func executeAndVerify(ctx *machine.Context, plan *engine.Plan, out io.Writer) (i
 }
 
 // confirmApplied re-inspects a step Apply reported done and reports whether
-// the machine now agrees, printing why when it does not.
+// the machine now agrees, printing why when it does not. A step that does not
+// agree carries the reason in its Err, so its package counts as incomplete and
+// the packages that need it stay gated.
 func confirmApplied(ctx *machine.Context, pkg string, sr *engine.StepResult, out io.Writer) bool {
 	h, ok := engine.HandlerFor(sr.Step.Kind())
 	if !ok {
 		return true
 	}
 	delta, err := h.Inspect(ctx, sr.Step)
-	if err != nil {
-		_, _ = fmt.Fprintf(out, "! %s: re-inspect failed: %v\n", pkg, err)
-		return false
+	switch {
+	case err != nil:
+		sr.Err = fmt.Errorf("re-inspect failed: %w", err)
+	case delta.Op != engine.OpNoop:
+		sr.Err = fmt.Errorf("not converged after apply: %s", delta.Detail)
+	default:
+		return true
 	}
-	if delta.Op != engine.OpNoop {
-		_, _ = fmt.Fprintf(out, "! %s: not converged after apply: %s\n", pkg, delta.Detail)
-		return false
-	}
-	return true
+	_, _ = fmt.Fprintf(out, "! %s: %v\n", pkg, sr.Err)
+	return false
 }
 
 // confirmConverged plans the already-prepared selection again against the

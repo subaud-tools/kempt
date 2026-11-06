@@ -428,3 +428,60 @@ description = "a"
 		t.Fatalf("error does not name the step: %q", errw.String())
 	}
 }
+
+// laterReadyHandler plans blocked on its first inspect and ready after, and
+// records whether Apply ran: a step whose tool another package installs.
+type laterReadyHandler struct{ inspected, applied *int }
+
+func (laterReadyHandler) Kind() string { return "symlink" }
+func (h laterReadyHandler) Inspect(*machine.Context, manifest.Step) (engine.Delta, error) {
+	*h.inspected++
+	if *h.inspected == 1 {
+		return engine.Delta{Op: engine.OpBlocked, Detail: "symlink (tool not found)"}, nil
+	}
+	return engine.Delta{Op: engine.OpChange, Detail: "symlink (now ready)"}, nil
+}
+func (h laterReadyHandler) Apply(*machine.Context, manifest.Step) error {
+	*h.applied++
+	return nil
+}
+
+// TestApplyKeepsDependentsGatedOnUnconvergedStep: a step that applied but did
+// not converge leaves its package incomplete, so a package that needs it does
+// not run a step that has become ready since the plan.
+func TestApplyKeepsDependentsGatedOnUnconvergedStep(t *testing.T) {
+	origLine, _ := engine.HandlerFor("line-in-file")
+	origLink, _ := engine.HandlerFor("symlink")
+	var inspected, applied int
+	engine.RegisterHandler(nonConvergingHandler{})
+	engine.RegisterHandler(laterReadyHandler{&inspected, &applied})
+	t.Cleanup(func() { engine.RegisterHandler(origLine); engine.RegisterHandler(origLink) })
+
+	src := `
+[kempt]
+spec = 1
+[packages.a]
+description = "a"
+  [[packages.a.line-in-file]]
+  file = "~/.profile"
+  line = "export EDITOR=vim"
+[packages.b]
+description = "b"
+needs = ["a"]
+  [[packages.b.symlink]]
+  from = "src/rc"
+  to = "~/.rc"
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &run.FakeRunner{})
+	var out, errw bytes.Buffer
+	if code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw); code == 0 {
+		t.Fatalf("exit = 0 with a step not converged; out=%s", out.String())
+	}
+	if applied != 0 {
+		t.Fatalf("b's step ran though a did not converge; out=%s", out.String())
+	}
+	if !strings.Contains(out.String(), "1 applied, 1 failed") {
+		t.Fatalf("failure miscounted: %q", out.String())
+	}
+}
