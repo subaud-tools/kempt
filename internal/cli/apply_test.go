@@ -287,3 +287,201 @@ description = "a"
 		t.Fatalf("exit = %d, want 1; out=%s err=%s", code, out.String(), errw.String())
 	}
 }
+
+// freshPiMachine is a machine with npm and no pi: npm installing pi's package
+// puts pi on PATH, and pi then installs extensions (dotfiles#125).
+type freshPiMachine struct {
+	pi         bool
+	extensions []string
+}
+
+func (m *freshPiMachine) Run(name string, args ...string) (string, error) {
+	key := strings.TrimSpace(name + " " + strings.Join(args, " "))
+	switch {
+	case key == "npm ls -g --depth=0 --json":
+		if m.pi {
+			return `{"dependencies":{"@earendil-works/pi-coding-agent":{"version":"1.0.0"}}}`, nil
+		}
+		return `{}`, nil
+	case key == "npm install -g @earendil-works/pi-coding-agent":
+		m.pi = true
+		return "", nil
+	case m.pi && key == "pi list":
+		return strings.Join(m.extensions, "\n"), nil
+	case m.pi && strings.HasPrefix(key, "pi install "):
+		m.extensions = append(m.extensions, strings.TrimPrefix(key, "pi install "))
+		return "", nil
+	}
+	return "", fmt.Errorf("unscripted command: %s", key)
+}
+
+func (m *freshPiMachine) LookPath(name string) (string, error) {
+	if name == "npm" || (name == "pi" && m.pi) {
+		return "/usr/local/bin/" + name, nil
+	}
+	return "", exec.ErrNotFound
+}
+
+// TestApplyRunsStepBlockedOnToolInstalledEarlier reproduces dotfiles#125: the
+// pi extensions step plans "install (pi not found)" before pi's npm install
+// runs, and one apply must still install the extensions.
+func TestApplyRunsStepBlockedOnToolInstalledEarlier(t *testing.T) {
+	src := `
+[kempt]
+spec = 1
+[packages.pi]
+description = "pi"
+  [[packages.pi.install]]
+  npm = ["@earendil-works/pi-coding-agent"]
+  [[packages.pi.install]]
+  pi = ["npm:pi-hail"]
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &freshPiMachine{})
+	var out, errw bytes.Buffer
+	if code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw); code != 0 {
+		t.Fatalf("apply exit = %d, want 0; out=%s err=%s", code, out.String(), errw.String())
+	}
+	if !strings.Contains(out.String(), "applied: pi install: npm:pi-hail") {
+		t.Fatalf("apply did not run the extensions step: %q", out.String())
+	}
+	out.Reset()
+	if code := Dispatch([]string{"plan", "-manifest", p}, &out, &errw); code != 0 {
+		t.Fatalf("plan exit = %d; out=%s err=%s", code, out.String(), errw.String())
+	}
+	if !strings.Contains(out.String(), "0 changes, 2 ok, 0 skipped, 0 blocked") {
+		t.Fatalf("plan after apply is not converged: %q", out.String())
+	}
+}
+
+// TestApplyFailsWhenAStepStaysBlocked: a blocked step left after apply is not
+// a success, whether or not apply had other changes to make.
+func TestApplyFailsWhenAStepStaysBlocked(t *testing.T) {
+	blocked := `
+  [[packages.a.install]]
+  npm = ["typescript"]
+`
+	for name, src := range map[string]string{
+		"with changes":  symlinkApplySrc + blocked,
+		"nothing to do": "[kempt]\nspec = 1\n[packages.a]\ndescription = \"a\"\n" + blocked,
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := writeTemp(t, src)
+			repo := filepath.Dir(p)
+			if err := os.MkdirAll(filepath.Join(repo, "src"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, "src", "rc"), []byte("rc\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			withContextHome(t, t.TempDir(), &run.FakeRunner{})
+			var out, errw bytes.Buffer
+			code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw)
+			if code == 0 {
+				t.Fatalf("exit = 0 with a step left blocked; out=%s", out.String())
+			}
+			if !strings.Contains(errw.String(), "a: install (npm not found)") {
+				t.Fatalf("error does not name the blocked step: %q", errw.String())
+			}
+		})
+	}
+}
+
+// claimingHandler models an apply that reports success on stale state: Apply
+// changes only the run's inventory cache, so the step looks done within the
+// run, and a fresh plan of the machine still shows the change.
+type claimingHandler struct{}
+
+func (claimingHandler) Kind() string { return "line-in-file" }
+func (claimingHandler) Inspect(ctx *machine.Context, _ manifest.Step) (engine.Delta, error) {
+	if ctx.Cache["claimed"] == "yes" {
+		return engine.Delta{Op: engine.OpNoop, Detail: "line-in-file ~/.profile"}, nil
+	}
+	return engine.Delta{Op: engine.OpChange, Detail: "line-in-file ~/.profile (claimed only)"}, nil
+}
+func (claimingHandler) Apply(ctx *machine.Context, _ manifest.Step) error {
+	ctx.Cache["claimed"] = "yes"
+	return nil
+}
+
+func TestApplyFailsWhenFreshPlanStillShowsAChange(t *testing.T) {
+	orig, _ := engine.HandlerFor("line-in-file")
+	engine.RegisterHandler(claimingHandler{})
+	t.Cleanup(func() { engine.RegisterHandler(orig) })
+	src := `
+[kempt]
+spec = 1
+[packages.a]
+description = "a"
+  [[packages.a.line-in-file]]
+  file = "~/.profile"
+  line = "export EDITOR=vim"
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &run.FakeRunner{})
+	var out, errw bytes.Buffer
+	code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw)
+	if code == 0 {
+		t.Fatalf("exit = 0 though a fresh plan still shows a change; out=%s", out.String())
+	}
+	if !strings.Contains(errw.String(), "a: line-in-file ~/.profile (claimed only)") {
+		t.Fatalf("error does not name the step: %q", errw.String())
+	}
+}
+
+// laterReadyHandler plans blocked on its first inspect and ready after, and
+// records whether Apply ran: a step whose tool another package installs.
+type laterReadyHandler struct{ inspected, applied *int }
+
+func (laterReadyHandler) Kind() string { return "symlink" }
+func (h laterReadyHandler) Inspect(*machine.Context, manifest.Step) (engine.Delta, error) {
+	*h.inspected++
+	if *h.inspected == 1 {
+		return engine.Delta{Op: engine.OpBlocked, Detail: "symlink (tool not found)"}, nil
+	}
+	return engine.Delta{Op: engine.OpChange, Detail: "symlink (now ready)"}, nil
+}
+func (h laterReadyHandler) Apply(*machine.Context, manifest.Step) error {
+	*h.applied++
+	return nil
+}
+
+// TestApplyKeepsDependentsGatedOnUnconvergedStep: a step that applied but did
+// not converge leaves its package incomplete, so a package that needs it does
+// not run a step that has become ready since the plan.
+func TestApplyKeepsDependentsGatedOnUnconvergedStep(t *testing.T) {
+	origLine, _ := engine.HandlerFor("line-in-file")
+	origLink, _ := engine.HandlerFor("symlink")
+	var inspected, applied int
+	engine.RegisterHandler(nonConvergingHandler{})
+	engine.RegisterHandler(laterReadyHandler{&inspected, &applied})
+	t.Cleanup(func() { engine.RegisterHandler(origLine); engine.RegisterHandler(origLink) })
+
+	src := `
+[kempt]
+spec = 1
+[packages.a]
+description = "a"
+  [[packages.a.line-in-file]]
+  file = "~/.profile"
+  line = "export EDITOR=vim"
+[packages.b]
+description = "b"
+needs = ["a"]
+  [[packages.b.symlink]]
+  from = "src/rc"
+  to = "~/.rc"
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &run.FakeRunner{})
+	var out, errw bytes.Buffer
+	if code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw); code == 0 {
+		t.Fatalf("exit = 0 with a step not converged; out=%s", out.String())
+	}
+	if applied != 0 {
+		t.Fatalf("b's step ran though a did not converge; out=%s", out.String())
+	}
+	if !strings.Contains(out.String(), "1 applied, 1 failed") {
+		t.Fatalf("failure miscounted: %q", out.String())
+	}
+}

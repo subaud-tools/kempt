@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0
+
+- **Behaviour change:** `apply`, `init`, `update` and `upgrade` now plan again after applying and exit non-zero, naming each step, when anything is left to change or blocked. Before, a run with blocked steps printed the count and exited 0.
+- One version rule for setup downloads, used by every command: a rolling download never goes below the installed version and holds a major bump for `kempt upgrade`. `plan`, `refresh`, `doctor` and `verify` no longer report a downgrade when a release newer than kempt's cached record is installed.
+- A step that planned blocked because an earlier step in the same apply installs its tool (pi's extensions before pi) now runs in that apply, so a fresh machine converges in one apply. A step whose apply didn't converge keeps the packages that need it held back.
+- `init` on an existing config checkout fetches and fast-forwards it; it stops, changing nothing, when the checkout has uncommitted changes, has diverged, or the update would overwrite an ignored local file.
+- A pinned `pi install` is read back after it runs, and the step fails naming the installed version when it didn't reach the pin (#38).
+
 ## 0.14.0
 
 - The `apt` install backend: on Linux an install step's `apt` list wins over `brew` (a Linux host has no Homebrew). kempt reads what is installed with `dpkg-query` once per run and plans the missing packages; apply runs `sudo -n apt-get update` once per run and `sudo -n apt-get install -y --no-install-recommends` with them. With no `apt-get`, or `sudo -n` refused, the step is blocked naming why. On macOS `brew` is still used when a step has both.

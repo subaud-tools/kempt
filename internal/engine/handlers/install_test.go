@@ -449,9 +449,10 @@ func TestInstallPiMissing(t *testing.T) {
 func TestInstallPiBadEntryDoesNotBlockRest(t *testing.T) {
 	fake := &run.FakeRunner{Responses: map[string]run.Response{
 		"lookpath pi":                    {Stdout: "/usr/bin/pi"},
-		"pi list":                        {Stdout: ""},
 		"pi install /missing/ext":        {Err: errors.New("Path does not exist")},
 		"pi install npm:artifacts@1.4.1": {},
+	}, Sequences: map[string][]run.Response{
+		"pi list": {{Stdout: ""}, {Stdout: "npm:artifacts@1.4.1\n"}},
 	}}
 	ctx := installCtx(t, "darwin", fake)
 	h := getInstallHandler(t)
@@ -461,9 +462,27 @@ func TestInstallPiBadEntryDoesNotBlockRest(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "/missing/ext") {
 		t.Fatalf("Apply err = %v; want an error naming /missing/ext", err)
 	}
-	want := []string{"lookpath pi", "pi list", "pi install /missing/ext", "pi install npm:artifacts@1.4.1"}
+	want := []string{"lookpath pi", "pi list", "pi install /missing/ext", "pi install npm:artifacts@1.4.1", "pi list"}
 	if !reflect.DeepEqual(fake.Calls, want) {
 		t.Fatalf("apply calls = %v; want %v", fake.Calls, want)
+	}
+}
+
+// kempt#38: pi install exits 0 on a pinned entry and leaves the old version
+// installed; the step must fail naming what is installed.
+func TestInstallPiPinNotReached(t *testing.T) {
+	fake := &run.FakeRunner{Responses: map[string]run.Response{
+		"lookpath pi":            {Stdout: "/usr/bin/pi"},
+		"pi list":                {Stdout: "npm:x@0.9.0\n"},
+		"pi install npm:x@0.9.1": {},
+	}}
+	ctx := installCtx(t, "darwin", fake)
+	h := getInstallHandler(t)
+
+	err := h.Apply(ctx, manifest.InstallStep{Pi: []string{"npm:x@0.9.1"}})
+	want := "npm:x: pi install reported success but 0.9.0 is installed, not 0.9.1"
+	if err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("Apply err = %v; want %q", err, want)
 	}
 }
 
@@ -885,8 +904,9 @@ func TestInstallPiPinnedMatch(t *testing.T) {
 func TestInstallPiPinnedMismatch(t *testing.T) {
 	fake := &run.FakeRunner{Responses: map[string]run.Response{
 		"lookpath pi":                         {Stdout: "/usr/bin/pi"},
-		"pi list":                             {Stdout: "npm:pi-tmux-bridge@0.1.1\n"},
 		"pi install npm:pi-tmux-bridge@0.1.2": {},
+	}, Sequences: map[string][]run.Response{
+		"pi list": {{Stdout: "npm:pi-tmux-bridge@0.1.1\n"}, {Stdout: "npm:pi-tmux-bridge@0.1.2\n"}},
 	}}
 	ctx := installCtx(t, "darwin", fake)
 	h := getInstallHandler(t)
@@ -907,7 +927,7 @@ func TestInstallPiPinnedMismatch(t *testing.T) {
 	if err := h.Apply(ctx, step); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
-	want := []string{"lookpath pi", "pi install npm:pi-tmux-bridge@0.1.2"}
+	want := []string{"lookpath pi", "pi install npm:pi-tmux-bridge@0.1.2", "pi list"}
 	if !reflect.DeepEqual(fake.Calls, want) {
 		t.Fatalf("apply calls = %v; want %v", fake.Calls, want)
 	}

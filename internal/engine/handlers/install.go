@@ -220,12 +220,33 @@ func piApply(ctx *machine.Context, desired []string) error {
 	// not block the ones after it, so every entry is tried and the failures are
 	// reported together.
 	var errs []error
+	var pinned []string
 	for _, p := range need {
 		if _, err := ctx.Runner.Run("pi", "install", p); err != nil {
 			errs = append(errs, fmt.Errorf("%s: %w", p, err))
+		} else if _, ver := splitNameVersion(p); ver != "" {
+			pinned = append(pinned, p)
 		}
 	}
 	delete(ctx.Cache, inventory.PiCmd)
+	if len(pinned) == 0 {
+		return errors.Join(errs...)
+	}
+	// pi install can exit 0 and keep the old version (kempt#38), so a pin is
+	// done when pi lists it, as RollExtensionTo confirms a roll.
+	present, err = inventory.Pi(ctx)
+	if err != nil {
+		return errors.Join(append(errs, err)...)
+	}
+	for _, p := range pinned {
+		name, ver := splitNameVersion(p)
+		if installed := present[name]; installed != ver {
+			if installed == "" {
+				installed = "nothing"
+			}
+			errs = append(errs, fmt.Errorf("%s: pi install reported success but %s is installed, not %s", name, installed, ver))
+		}
+	}
 	return errors.Join(errs...)
 }
 
