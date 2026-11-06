@@ -155,9 +155,11 @@ func runUpgrade(args []string, out, errw io.Writer) error {
 	}
 
 	if len(setupSelected) > 0 {
-		_, failed := executeAndVerify(ctx, setupPlan, out)
-		if failed > 0 || countBlocked(setupPlan) > 0 {
-			return fmt.Errorf("release setup upgrade incomplete")
+		if _, failed := executeAndVerify(ctx, setupPlan, out); failed > 0 {
+			return fmt.Errorf("release setup upgrade incomplete: %d step(s) failed", failed)
+		}
+		if err := confirmConverged(ctx, setupSelected); err != nil {
+			return fmt.Errorf("release setup upgrade incomplete: %w", err)
 		}
 	}
 	h, _ := engine.HandlerFor("download")

@@ -353,3 +353,78 @@ description = "pi"
 		t.Fatalf("plan after apply is not converged: %q", out.String())
 	}
 }
+
+// TestApplyFailsWhenAStepStaysBlocked: a blocked step left after apply is not
+// a success, whether or not apply had other changes to make.
+func TestApplyFailsWhenAStepStaysBlocked(t *testing.T) {
+	blocked := `
+  [[packages.a.install]]
+  npm = ["typescript"]
+`
+	for name, src := range map[string]string{
+		"with changes":  symlinkApplySrc + blocked,
+		"nothing to do": "[kempt]\nspec = 1\n[packages.a]\ndescription = \"a\"\n" + blocked,
+	} {
+		t.Run(name, func(t *testing.T) {
+			p := writeTemp(t, src)
+			repo := filepath.Dir(p)
+			if err := os.MkdirAll(filepath.Join(repo, "src"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(repo, "src", "rc"), []byte("rc\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			withContextHome(t, t.TempDir(), &run.FakeRunner{})
+			var out, errw bytes.Buffer
+			code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw)
+			if code == 0 {
+				t.Fatalf("exit = 0 with a step left blocked; out=%s", out.String())
+			}
+			if !strings.Contains(errw.String(), "a: install (npm not found)") {
+				t.Fatalf("error does not name the blocked step: %q", errw.String())
+			}
+		})
+	}
+}
+
+// claimingHandler models an apply that reports success on stale state: Apply
+// changes only the run's inventory cache, so the step looks done within the
+// run, and a fresh plan of the machine still shows the change.
+type claimingHandler struct{}
+
+func (claimingHandler) Kind() string { return "line-in-file" }
+func (claimingHandler) Inspect(ctx *machine.Context, _ manifest.Step) (engine.Delta, error) {
+	if ctx.Cache["claimed"] == "yes" {
+		return engine.Delta{Op: engine.OpNoop, Detail: "line-in-file ~/.profile"}, nil
+	}
+	return engine.Delta{Op: engine.OpChange, Detail: "line-in-file ~/.profile (claimed only)"}, nil
+}
+func (claimingHandler) Apply(ctx *machine.Context, _ manifest.Step) error {
+	ctx.Cache["claimed"] = "yes"
+	return nil
+}
+
+func TestApplyFailsWhenFreshPlanStillShowsAChange(t *testing.T) {
+	orig, _ := engine.HandlerFor("line-in-file")
+	engine.RegisterHandler(claimingHandler{})
+	t.Cleanup(func() { engine.RegisterHandler(orig) })
+	src := `
+[kempt]
+spec = 1
+[packages.a]
+description = "a"
+  [[packages.a.line-in-file]]
+  file = "~/.profile"
+  line = "export EDITOR=vim"
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &run.FakeRunner{})
+	var out, errw bytes.Buffer
+	code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw)
+	if code == 0 {
+		t.Fatalf("exit = 0 though a fresh plan still shows a change; out=%s", out.String())
+	}
+	if !strings.Contains(errw.String(), "a: line-in-file ~/.profile (claimed only)") {
+		t.Fatalf("error does not name the step: %q", errw.String())
+	}
+}

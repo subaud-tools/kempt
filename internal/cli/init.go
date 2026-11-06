@@ -198,6 +198,9 @@ func runInit(args []string, out, errw io.Writer) error {
 		if err := blockedReleaseSetup(plan, true); err != nil {
 			return err
 		}
+		if err := unconverged(plan); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintln(out, "nothing to do")
 		return nil
 	}
@@ -218,10 +221,9 @@ func runInit(args []string, out, errw io.Writer) error {
 	if err := blockedReleaseSetup(plan, true); err != nil {
 		return err
 	}
-	blocked := countBlocked(plan)
 	_, _ = fmt.Fprintf(out, "%d applied, %d failed\n", applied, failed)
-	if blocked > 0 {
-		_, _ = fmt.Fprintf(out, "%d blocked (unresolved)\n", blocked)
+	if err := confirmConverged(ctx, selected); err != nil {
+		return err
 	}
 	if failed > 0 {
 		return fmt.Errorf("%d step(s) failed", failed)

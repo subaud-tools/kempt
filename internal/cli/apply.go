@@ -131,6 +131,9 @@ func runApply(args []string, out, errw io.Writer) error {
 		if err := blockedReleaseSetup(plan, true); err != nil {
 			return err
 		}
+		if err := unconverged(plan); err != nil {
+			return err
+		}
 		_, _ = fmt.Fprintln(out, "nothing to do")
 		return nil
 	}
@@ -148,10 +151,9 @@ func runApply(args []string, out, errw io.Writer) error {
 		return err
 	}
 
-	blocked := countBlocked(plan)
 	_, _ = fmt.Fprintf(out, "%d applied, %d failed\n", applied, failed)
-	if blocked > 0 {
-		_, _ = fmt.Fprintf(out, "%d blocked (unresolved)\n", blocked)
+	if err := confirmConverged(ctx, selected); err != nil {
+		return err
 	}
 
 	if failed > 0 {
@@ -271,6 +273,40 @@ func confirmApplied(ctx *machine.Context, pkg string, sr *engine.StepResult, out
 	return true
 }
 
+// confirmConverged plans the already-prepared selection again against the
+// machine as it now is, with a fresh inventory cache and no online resolve,
+// and fails naming every step that still has a change or is blocked: an
+// apply only succeeds when a following kempt plan has nothing left.
+func confirmConverged(ctx *machine.Context, selected []*manifest.Package) error {
+	fresh := *ctx
+	fresh.Cache = map[string]string{}
+	plan, err := engine.BuildPlan(&fresh, selected)
+	if err != nil {
+		return fmt.Errorf("plan after apply: %w", err)
+	}
+	return unconverged(plan)
+}
+
+// unconverged returns an error naming each step of plan that has a change or
+// is blocked, or nil when there is none.
+func unconverged(plan *engine.Plan) error {
+	var left []string
+	for _, pp := range plan.Packages {
+		if pp.Skipped {
+			continue
+		}
+		for _, sr := range pp.Steps {
+			if sr.Delta.Op == engine.OpChange || sr.Delta.Op == engine.OpBlocked {
+				left = append(left, pp.Name+": "+sr.Delta.Detail)
+			}
+		}
+	}
+	if len(left) == 0 {
+		return nil
+	}
+	return fmt.Errorf("not converged, %d step(s) left:\n  %s", len(left), strings.Join(left, "\n  "))
+}
+
 func countChanges(p *engine.Plan) int {
 	n := 0
 	for _, pp := range p.Packages {
@@ -279,21 +315,6 @@ func countChanges(p *engine.Plan) int {
 		}
 		for _, sr := range pp.Steps {
 			if sr.Delta.Op == engine.OpChange {
-				n++
-			}
-		}
-	}
-	return n
-}
-
-func countBlocked(p *engine.Plan) int {
-	n := 0
-	for _, pp := range p.Packages {
-		if pp.Skipped {
-			continue
-		}
-		for _, sr := range pp.Steps {
-			if sr.Delta.Op == engine.OpBlocked {
 				n++
 			}
 		}
