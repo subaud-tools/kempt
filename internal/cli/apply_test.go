@@ -287,3 +287,69 @@ description = "a"
 		t.Fatalf("exit = %d, want 1; out=%s err=%s", code, out.String(), errw.String())
 	}
 }
+
+// freshPiMachine is a machine with npm and no pi: npm installing pi's package
+// puts pi on PATH, and pi then installs extensions (dotfiles#125).
+type freshPiMachine struct {
+	pi         bool
+	extensions []string
+}
+
+func (m *freshPiMachine) Run(name string, args ...string) (string, error) {
+	key := strings.TrimSpace(name + " " + strings.Join(args, " "))
+	switch {
+	case key == "npm ls -g --depth=0 --json":
+		if m.pi {
+			return `{"dependencies":{"@earendil-works/pi-coding-agent":{"version":"1.0.0"}}}`, nil
+		}
+		return `{}`, nil
+	case key == "npm install -g @earendil-works/pi-coding-agent":
+		m.pi = true
+		return "", nil
+	case m.pi && key == "pi list":
+		return strings.Join(m.extensions, "\n"), nil
+	case m.pi && strings.HasPrefix(key, "pi install "):
+		m.extensions = append(m.extensions, strings.TrimPrefix(key, "pi install "))
+		return "", nil
+	}
+	return "", fmt.Errorf("unscripted command: %s", key)
+}
+
+func (m *freshPiMachine) LookPath(name string) (string, error) {
+	if name == "npm" || (name == "pi" && m.pi) {
+		return "/usr/local/bin/" + name, nil
+	}
+	return "", exec.ErrNotFound
+}
+
+// TestApplyRunsStepBlockedOnToolInstalledEarlier reproduces dotfiles#125: the
+// pi extensions step plans "install (pi not found)" before pi's npm install
+// runs, and one apply must still install the extensions.
+func TestApplyRunsStepBlockedOnToolInstalledEarlier(t *testing.T) {
+	src := `
+[kempt]
+spec = 1
+[packages.pi]
+description = "pi"
+  [[packages.pi.install]]
+  npm = ["@earendil-works/pi-coding-agent"]
+  [[packages.pi.install]]
+  pi = ["npm:pi-hail"]
+`
+	p := writeTemp(t, src)
+	withContextHome(t, t.TempDir(), &freshPiMachine{})
+	var out, errw bytes.Buffer
+	if code := Dispatch([]string{"apply", "-yes", "-manifest", p}, &out, &errw); code != 0 {
+		t.Fatalf("apply exit = %d, want 0; out=%s err=%s", code, out.String(), errw.String())
+	}
+	if !strings.Contains(out.String(), "applied: pi install: npm:pi-hail") {
+		t.Fatalf("apply did not run the extensions step: %q", out.String())
+	}
+	out.Reset()
+	if code := Dispatch([]string{"plan", "-manifest", p}, &out, &errw); code != 0 {
+		t.Fatalf("plan exit = %d; out=%s err=%s", code, out.String(), errw.String())
+	}
+	if !strings.Contains(out.String(), "0 changes, 2 ok, 0 skipped, 0 blocked") {
+		t.Fatalf("plan after apply is not converged: %q", out.String())
+	}
+}

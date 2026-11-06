@@ -162,56 +162,113 @@ func runApply(args []string, out, errw io.Writer) error {
 
 // executeAndVerify runs the plan then re-inspects every step Execute claims it
 // applied. If any is not now OpNoop, the machine did not actually converge and
-// the step is counted as failed. In a package that applied a change it also
-// re-inspects that package's pre-apply-blocked verify steps, so a verify of a
-// tool installed earlier in the same run is judged against post-apply state
-// rather than reported as spuriously blocked. Returns (applied, failed).
+// the step is counted as failed.
+//
+// kempt plans every step before any runs, so a step whose tool an earlier step
+// installs in the same run is planned blocked (pi's extensions before pi's npm
+// install, dotfiles#125; a verify of a tool installed this run). After Execute,
+// each blocked step in a package where something applied, in a package that
+// needs one where something applied, or in a release setup package, is
+// re-inspected against the machine as it now is: a step now ready runs (and is
+// confirmed like any other), one now in order is updated, and one still
+// blocked keeps its blocked delta. Passes repeat until one runs nothing, since
+// a step that runs can unblock another. Returns (applied, failed).
 func executeAndVerify(ctx *machine.Context, plan *engine.Plan, out io.Writer) (int, int) {
 	failed := engine.Execute(ctx, plan, out)
 	applied := 0
+	touched := map[string]bool{}
 	for i := range plan.Packages {
 		pp := &plan.Packages[i]
 		pctx := engine.ContextFor(ctx, pp.Root)
-		pkgChanged := false
 		for j := range pp.Steps {
-			if pp.Steps[j].Applied {
-				pkgChanged = true
-				break
+			if sr := &pp.Steps[j]; sr.Applied {
+				applied++
+				touched[pp.Name] = true
+				if !confirmApplied(pctx, pp.Name, sr, out) {
+					failed++
+				}
 			}
 		}
-		for j := range pp.Steps {
-			sr := &pp.Steps[j]
-			h, ok := engine.HandlerFor(sr.Step.Kind())
-			if sr.Applied {
-				applied++
+	}
+	for ran := true; ran; {
+		ran = false
+		incomplete := map[string]bool{}
+		for i := range plan.Packages {
+			pp := &plan.Packages[i]
+			if pp.Skipped {
+				continue
+			}
+			ready, woken := true, touched[pp.Name] || pp.Resolved != nil
+			for _, need := range pp.Needs {
+				ready = ready && !incomplete[need]
+				woken = woken || touched[need]
+			}
+			for _, sr := range pp.Steps {
+				ready = ready && sr.Err == nil
+			}
+			pctx := engine.ContextFor(ctx, pp.Root)
+			for j := range pp.Steps {
+				sr := &pp.Steps[j]
+				if !woken || sr.Delta.Op != engine.OpBlocked {
+					continue
+				}
+				h, ok := engine.HandlerFor(sr.Step.Kind())
 				if !ok {
 					continue
 				}
 				delta, err := h.Inspect(pctx, sr.Step)
-				if err != nil {
-					_, _ = fmt.Fprintf(out, "! %s: re-inspect failed: %v\n", pp.Name, err)
-					failed++
+				if err != nil || delta.Op == engine.OpBlocked || (delta.Op == engine.OpChange && !ready) {
 					continue
 				}
-				if delta.Op != engine.OpNoop {
-					_, _ = fmt.Fprintf(out, "! %s: not converged after apply: %s\n", pp.Name, delta.Detail)
+				sr.Delta = delta
+				if delta.Op != engine.OpChange {
+					continue
+				}
+				ran = true
+				if err := h.Apply(pctx, sr.Step); err != nil {
+					sr.Err = err
+					_, _ = fmt.Fprintf(out, "! %s: %s: %v\n", pp.Name, delta.Detail, err)
+					failed++
+					break
+				}
+				sr.Applied = true
+				applied++
+				touched[pp.Name] = true
+				_, _ = fmt.Fprintf(out, "applied: %s\n", delta.Detail)
+				if !confirmApplied(pctx, pp.Name, sr, out) {
 					failed++
 				}
-				continue
 			}
-			// A verify step is inspected up front, against pre-apply state, and is
-			// never itself an OpChange the engine applies. When a sibling step in
-			// the same package installed the thing being verified this run, that
-			// stale OpBlocked is a false positive — re-inspect it against post-apply
-			// state so the run's blocked count reflects reality.
-			if ok && (pkgChanged || pp.Resolved != nil) && sr.Delta.Op == engine.OpBlocked && sr.Step.Kind() == "verify" {
-				if delta, err := h.Inspect(pctx, sr.Step); err == nil {
-					sr.Delta = delta
+			if !ready {
+				incomplete[pp.Name] = true
+			}
+			for _, sr := range pp.Steps {
+				if sr.Err != nil || (sr.Delta.Op == engine.OpBlocked && sr.Step.Kind() != "verify") {
+					incomplete[pp.Name] = true
 				}
 			}
 		}
 	}
 	return applied, failed
+}
+
+// confirmApplied re-inspects a step Apply reported done and reports whether
+// the machine now agrees, printing why when it does not.
+func confirmApplied(ctx *machine.Context, pkg string, sr *engine.StepResult, out io.Writer) bool {
+	h, ok := engine.HandlerFor(sr.Step.Kind())
+	if !ok {
+		return true
+	}
+	delta, err := h.Inspect(ctx, sr.Step)
+	if err != nil {
+		_, _ = fmt.Fprintf(out, "! %s: re-inspect failed: %v\n", pkg, err)
+		return false
+	}
+	if delta.Op != engine.OpNoop {
+		_, _ = fmt.Fprintf(out, "! %s: not converged after apply: %s\n", pkg, delta.Detail)
+		return false
+	}
+	return true
 }
 
 func countChanges(p *engine.Plan) int {
