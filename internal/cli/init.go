@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"github.com/subaud-tools/kempt/internal/gitrepo"
 	"github.com/subaud-tools/kempt/internal/manifest"
 	"github.com/subaud-tools/kempt/internal/picker"
+	"github.com/subaud-tools/kempt/internal/run"
 	"github.com/subaud-tools/kempt/internal/setup"
 	"github.com/subaud-tools/kempt/internal/state"
 )
@@ -101,7 +103,10 @@ func runInit(args []string, out, errw io.Writer) error {
 					return fmt.Errorf("clone %s: %w", url, err)
 				}
 			case origin == url:
-				// Already the right checkout; reuse.
+				// Already the right checkout: bring it up to date and reuse it.
+				if err := updateCheckout(ctx.Runner, dir, errw); err != nil {
+					return err
+				}
 			default:
 				return UsageError{Msg: fmt.Sprintf("%s already has origin %q, not %q", dir, origin, url)}
 			}
@@ -110,6 +115,9 @@ func runInit(args []string, out, errw io.Writer) error {
 				return UsageError{Msg: "provide a repo URL to clone"}
 			}
 			url = origin
+			if err := updateCheckout(ctx.Runner, dir, errw); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -227,6 +235,23 @@ func runInit(args []string, out, errw io.Writer) error {
 	}
 	if failed > 0 {
 		return fmt.Errorf("%d step(s) failed", failed)
+	}
+	return nil
+}
+
+// updateCheckout fetches an existing config checkout and fast-forwards it, so
+// init plans against what the remote holds. Fetch is best-effort, as in
+// refresh: offline, init carries on with the checkout as it is. A checkout
+// with local work in the way stops init before anything is planned.
+func updateCheckout(r run.Runner, dir string, errw io.Writer) error {
+	if err := gitrepo.Fetch(r, dir); err != nil {
+		_, _ = fmt.Fprintf(errw, "warning: could not fetch %s: %v; using the checkout as it is\n", dir, err)
+	}
+	if err := gitrepo.FastForward(r, dir); err != nil {
+		if errors.Is(err, gitrepo.ErrNotFastForward) {
+			return UsageError{Msg: fmt.Sprintf("%s: %s; commit and push, or discard, the local work, then run kempt init again", dir, strings.TrimPrefix(err.Error(), gitrepo.ErrNotFastForward.Error()+": "))}
+		}
+		return fmt.Errorf("update %s: %w", dir, err)
 	}
 	return nil
 }
